@@ -1,0 +1,72 @@
+name: Windows CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    name: Build, test and format
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore Konvert.sln
+      - run: dotnet build Konvert.sln -c Release --no-restore
+      - run: dotnet format Konvert.sln --verify-no-changes --no-restore
+      - run: dotnet run --project tests/Konvert.Tests -c Release --no-build
+      - name: Dependency audit
+        shell: pwsh
+        run: |
+          $report = dotnet list Konvert.sln package --vulnerable --include-transitive --format json | ConvertFrom-Json
+          if ($LASTEXITCODE) { throw 'Dependency audit failed.' }
+          if ($report.projects.frameworks.topLevelPackages.vulnerabilities -or $report.projects.frameworks.transitivePackages.vulnerabilities) { throw 'Vulnerable dependencies detected.' }
+  engines:
+    name: Optional engine integration
+    runs-on: windows-2025
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install test engines
+        run: choco install ffmpeg libreoffice-fresh --yes --no-progress --limit-output
+      - name: Test actual engine exports and decoding
+        shell: pwsh
+        run: |
+          $env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + $env:PATH
+          dotnet run --project tests/Konvert.Tests -c Release -- --require-ffmpeg --require-office
+          if ($LASTEXITCODE) { throw 'Engine integration failed.' }
+  package:
+    name: Package (${{ matrix.arch }})
+    needs: verify
+    runs-on: windows-2025
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: '10.0.x'
+      - run: ./scripts/Build.ps1 -Runtime win-${{ matrix.arch }}
+      - run: ./scripts/Build-Msix.ps1 -Architecture ${{ matrix.arch }} -IdentityName Shardapps.Konvert.Development -Publisher CN=Shardapps.Development
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Konvert-${{ matrix.arch }}-preview
+          path: |
+            artifacts/*.zip
+            artifacts/*.msix
+          if-no-files-found: error
+          retention-days: 14

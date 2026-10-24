@@ -1,0 +1,26 @@
+name: Bug report
+description: Report reproducible app or conversion behavior
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: 'For vulnerabilities, use SECURITY.md. Do not attach private documents or secrets.'
+  - type: input
+    id: version
+    attributes:
+      label: App version or commit
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Windows, architecture, runtime and optional engine versions
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps, expected result and actual result
+      description: Include source/target formats and a small generated or non-sensitive sample if possible.
+    validations:
+      required: true
