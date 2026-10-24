@@ -9,15 +9,16 @@ internal static class TableConverter
     private const int MaxRows = 100_000;
     private const int MaxColumns = 1_000;
 
-    public static List<string[]> Parse(string text, char delimiter)
+    public static IEnumerable<string[]> Parse(string text, char delimiter, CancellationToken token = default)
     {
-        var rows = new List<string[]>();
+        var rowCount = 0;
         var row = new List<string>();
         var field = new StringBuilder();
         var quoted = false;
         var closedQuote = false;
         for (var i = 0; i < text.Length; i++)
         {
+            if ((i & 4095) == 0) token.ThrowIfCancellationRequested();
             var c = text[i];
             if (quoted)
             {
@@ -34,29 +35,30 @@ internal static class TableConverter
             if (c is '\r' or '\n')
             {
                 if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n') i++;
-                AddRow();
+                yield return AddRow();
                 continue;
             }
             if (closedQuote || c == '"') throw new InvalidDataException("Malformed table: unexpected text around a quote.");
             field.Append(c);
         }
         if (quoted) throw new InvalidDataException("Malformed table: unclosed quoted field.");
-        if (field.Length > 0 || row.Count > 0 || closedQuote) AddRow();
-        return rows;
+        if (field.Length > 0 || row.Count > 0 || closedQuote) yield return AddRow();
 
         void AddField()
         {
             if (row.Count >= MaxColumns) throw new InvalidDataException("Tables are limited to 1,000 columns.");
             row.Add(field.ToString()); field.Clear(); closedQuote = false;
         }
-        void AddRow()
+        string[] AddRow()
         {
-            if (rows.Count >= MaxRows) throw new InvalidDataException("Tables are limited to 100,000 rows.");
-            AddField(); rows.Add(row.ToArray()); row.Clear();
+            if (rowCount++ >= MaxRows) throw new InvalidDataException("Tables are limited to 100,000 rows.");
+            AddField();
+            var result = row.ToArray(); row.Clear();
+            return result;
         }
     }
 
-    public static void Convert(string input, string output, string source, string target)
+    public static void Convert(string input, string output, string source, string target, CancellationToken token)
     {
         if (source == "json")
         {
@@ -67,6 +69,7 @@ internal static class TableConverter
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var item in document.RootElement.EnumerateArray())
             {
+                token.ThrowIfCancellationRequested();
                 if (item.ValueKind != JsonValueKind.Object) throw new InvalidDataException("Every JSON row must be an object.");
                 var keys = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var property in item.EnumerateObject())
@@ -80,21 +83,27 @@ internal static class TableConverter
             using var writer = new StreamWriter(output, false, new UTF8Encoding(false));
             WriteRow(writer, columns, ',');
             foreach (var item in document.RootElement.EnumerateArray())
+            {
+                token.ThrowIfCancellationRequested();
                 WriteRow(writer, columns.Select(column => item.TryGetProperty(column, out var value) ? Scalar(value) : ""), ',');
+            }
             return;
         }
-        var rows = Parse(File.ReadAllText(input), source == "tsv" ? '\t' : ',');
+        var rows = Parse(File.ReadAllText(input), source == "tsv" ? '\t' : ',', token);
         if (target == "json")
         {
-            if (rows.Count == 0) { File.WriteAllText(output, "[]"); return; }
-            var headers = rows[0];
+            using var iterator = rows.GetEnumerator();
+            if (!iterator.MoveNext()) { File.WriteAllText(output, "[]"); return; }
+            var headers = iterator.Current;
             if (headers.Any(string.IsNullOrWhiteSpace) || headers.Distinct(StringComparer.Ordinal).Count() != headers.Length)
                 throw new InvalidDataException("JSON export needs unique, non-empty column headings.");
             using var stream = File.Create(output);
             using var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true });
             writer.WriteStartArray();
-            foreach (var row in rows.Skip(1))
+            while (iterator.MoveNext())
             {
+                token.ThrowIfCancellationRequested();
+                var row = iterator.Current;
                 if (row.Length != headers.Length) throw new InvalidDataException("Each table row must have the same number of fields as the header.");
                 writer.WriteStartObject();
                 for (var i = 0; i < headers.Length; i++) writer.WriteString(headers[i], row[i]);
@@ -105,7 +114,11 @@ internal static class TableConverter
         else
         {
             using var writer = new StreamWriter(output, false, new UTF8Encoding(false));
-            foreach (var row in rows) WriteRow(writer, row, target == "tsv" ? '\t' : ',');
+            foreach (var row in rows)
+            {
+                token.ThrowIfCancellationRequested();
+                WriteRow(writer, row, target == "tsv" ? '\t' : ',');
+            }
         }
     }
 

@@ -13,18 +13,21 @@ internal static class TextConverter
     {
         if (new FileInfo(input).Length > MaxInputBytes) throw new InvalidDataException("Text and table inputs are limited to 16 MiB in this alpha.");
         if (source is "csv" or "tsv" && target is "json" or "csv" or "tsv" || source == "json" && target == "csv")
-        { TableConverter.Convert(input, output, source, target); return; }
+        { TableConverter.Convert(input, output, source, target, token); return; }
         if (source == "docx") { ExtractDocx(input, output, token); return; }
         // Strict UTF-8 avoids silently replacing invalid bytes. BOM-marked UTF-16/32 is detected.
         using var reader = new StreamReader(input, new UTF8Encoding(false, true), true);
         using var writer = new StreamWriter(output, false, new UTF8Encoding(false));
         if (target == "html")
             writer.Write("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Converted text</title><style>body{max-width:80ch;margin:4rem auto;padding:0 2rem;font:16px/1.7 system-ui}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><pre>");
-        var buffer = new char[8192];
+        var buffer = new char[8193];
         int count;
-        while ((count = reader.Read(buffer, 0, buffer.Length)) > 0)
+        while ((count = reader.Read(buffer, 0, buffer.Length - 1)) > 0)
         {
             token.ThrowIfCancellationRequested();
+            // Keep a surrogate pair together before independently HTML-encoding each chunk.
+            if (char.IsHighSurrogate(buffer[count - 1]) && reader.Peek() >= 0)
+                buffer[count++] = (char)reader.Read();
             if (target == "html") writer.Write(WebUtility.HtmlEncode(new string(buffer, 0, count)));
             else writer.Write(buffer, 0, count);
         }

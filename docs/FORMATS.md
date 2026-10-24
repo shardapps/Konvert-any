@@ -58,7 +58,7 @@ Audio extraction selects the first audio track and fails if none exists. Video s
 - JPEG and image PDF flatten transparency to white. GIF has a limited palette. TIFF uses ZIP compression. PNG is lossless after pixel normalization, which may change color profiles/metadata.
 - Image PDF is a single page with an embedded JPEG; it is not OCR/searchable text. Print size is pixels × 72 / DPI in PDF points. No enlargement or detail recovery is implied.
 - DPI changes print metadata/PDF physical size while keeping image pixel dimensions. JPEG quality applies to JPG and image-PDF only.
-- Native text/table and compressed DOCX inputs: **16 MiB**; DOCX main document XML expanded content is also capped. Tables: **100,000 rows**, **1,000 columns**. CSV/JSON structural conversion holds the bounded input in memory; text-to-text/HTML streams.
+- Native text/table and compressed DOCX inputs: **16 MiB**; DOCX main document XML expanded content is also capped. Tables: **100,000 rows**, **1,000 columns**. Table conversion holds bounded input text/JSON in memory; CSV/TSV rows are yielded incrementally. Text-to-text/HTML streams.
 - Empty text outputs are allowed. Failed or cancelled operations clean staging files on a best-effort basis. Native codec calls cannot be interrupted mid-call; cancellation completes when that call returns.
 - One file at a time. Multiple app processes are not globally serialized. A crash/power loss can leave temporary files. Existing files are never deliberately overwritten.
 

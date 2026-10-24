@@ -40,7 +40,11 @@ public sealed class ConversionService(EngineCapabilities capabilities) : IDispos
         }
         finally
         {
-            if (staging is not null) { try { File.Delete(staging); } catch (IOException) { } }
+            if (staging is not null)
+            {
+                try { File.Delete(staging); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            }
             gate.Release();
         }
     }
@@ -73,7 +77,11 @@ public sealed class ConversionService(EngineCapabilities capabilities) : IDispos
             if (!File.Exists(result)) throw new IOException("LibreOffice could not export this file. It may be corrupt, encrypted, or unsupported.");
             File.Copy(result, output, false);
         }
-        finally { try { Directory.Delete(workspace, true); } catch (IOException) { } }
+        finally
+        {
+            try { Directory.Delete(workspace, true); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
     }
 
     private async Task ConvertMediaAsync(string input, string output, string extension, CancellationToken token)

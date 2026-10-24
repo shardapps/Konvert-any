@@ -28,6 +28,10 @@ Konvert is a free, open source Windows file conversion app by **Shardapps**. Cho
 
 ## Small surface. Useful choices.
 
+<img src="docs/assets/app-alpha.png" width="808" alt="Actual Konvert alpha window: graphite and cyan radial picker with JPG, BMP, TIFF, GIF and PDF options for a PNG file" />
+
+*Actual 0.1 alpha interface on Windows 11. The banner above is separate brand artwork.*
+
 - **Native Windows interface.** Graphite surfaces, icy cyan accents, keyboard focus, DPI awareness, short transitions, and reduced motion.
 - **Local by design.** No upload endpoint, account, ads, analytics, startup task, or resident background service. Closing the window exits the app.
 - **Responsive conversion.** Heavy work runs on a worker or child process, away from the UI thread. One heavy job runs per process; media workers use bounded thread settings.

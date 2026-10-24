@@ -46,13 +46,13 @@ internal static class Program
         });
         await Test("CSV parser handles multiline, quotes, trailing fields", () =>
         {
-            var rows = TableConverter.Parse("a,b,c\r\n\"one\ntwo\",\"a\"\"b\",\r\n", ',');
+            var rows = TableConverter.Parse("a,b,c\r\n\"one\ntwo\",\"a\"\"b\",\r\n", ',').ToList();
             Equal(2, rows.Count); Equal("one\ntwo", rows[1][0]); Equal("a\"b", rows[1][1]); Equal("", rows[1][2]);
         });
         await Test("CSV parser rejects malformed quotes", () =>
         {
-            Throws<InvalidDataException>(() => TableConverter.Parse("a\n\"unterminated", ','));
-            Throws<InvalidDataException>(() => TableConverter.Parse("a\n\"x\"oops", ','));
+            Throws<InvalidDataException>(() => TableConverter.Parse("a\n\"unterminated", ',').ToList());
+            Throws<InvalidDataException>(() => TableConverter.Parse("a\n\"x\"oops", ',').ToList());
         });
         await TestAsync("HTML escapes active content and preserves Unicode", async () =>
         {
@@ -69,6 +69,14 @@ internal static class Program
             Equal("keep", File.ReadAllText(Path.Combine(Root, "collision.txt")));
             Equal("original", File.ReadAllText(source)); True(results[0].OutputPath != results[1].OutputPath);
         });
+        await TestAsync("HTML preserves emoji across streaming chunk boundaries", async () =>
+        {
+            var text = new string('a', 8191) + "😀tail";
+            var result = await service.ConvertAsync(Put("boundary.txt", text), "html", new());
+            var html = File.ReadAllText(result.OutputPath);
+            var content = html[(html.IndexOf("<pre>", StringComparison.Ordinal) + 5)..html.LastIndexOf("</pre>", StringComparison.Ordinal)];
+            Equal(text, System.Net.WebUtility.HtmlDecode(content));
+        });
         await TestAsync("CSV to JSON keeps every column as text", async () =>
         {
             var source = Put("table.csv", "id,name\n001,\"hello, world\"\n");
@@ -77,7 +85,7 @@ internal static class Program
             Equal("001", json.RootElement[0].GetProperty("id").GetString());
             Equal("hello, world", json.RootElement[0].GetProperty("name").GetString());
             var back = await service.ConvertAsync(result.OutputPath, "csv", new());
-            Equal("hello, world", TableConverter.Parse(File.ReadAllText(back.OutputPath), ',')[1][1]);
+            Equal("hello, world", TableConverter.Parse(File.ReadAllText(back.OutputPath), ',').ElementAt(1)[1]);
         });
         await TestAsync("Ragged CSV fails and cleans staging output", async () =>
         {

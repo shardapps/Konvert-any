@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Microsoft.Win32;
@@ -20,6 +21,11 @@ public sealed class SettingsWindow : Window
     {
         Settings = settings;
         Style = (Style)FindResource(typeof(Window));
+        AutomationProperties.SetName(folder, "Output folder. Leave blank to save beside the original.");
+        AutomationProperties.SetName(office, "Optional LibreOffice executable path");
+        AutomationProperties.SetName(ffmpeg, "Optional FFmpeg executable path");
+        AutomationProperties.SetName(quality, "JPEG and image PDF quality, percent");
+        AutomationProperties.SetName(dpi, "Image output DPI. Pixel dimensions stay unchanged.");
         Title = "Konvert · Settings"; Width = 590; Height = 720; MinWidth = 500; MinHeight = 500;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         quality.Value = settings.JpegQuality; dpi.Value = settings.Dpi;

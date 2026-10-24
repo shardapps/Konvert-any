@@ -23,7 +23,7 @@ internal static class ShellIntegration
         var userPath = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User) ?? "";
         if (!userPath.Split(';').Any(item => SamePath(item, directory)))
         {
-            Environment.SetEnvironmentVariable("PATH", userPath.TrimEnd(';') + ";" + directory, EnvironmentVariableTarget.User);
+            Environment.SetEnvironmentVariable("PATH", string.IsNullOrEmpty(userPath) ? directory : userPath.TrimEnd(';') + ";" + directory, EnvironmentVariableTarget.User);
             tracking.SetValue("OwnedPath", directory);
         }
         Broadcast();
