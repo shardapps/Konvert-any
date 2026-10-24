@@ -15,6 +15,7 @@ try {
     $output = Join-Path $root "artifacts/$Runtime-$kind"
     & $Dotnet publish src/Konvert -c Release -r $Runtime --self-contained $SelfContained.IsPresent -o $output -p:DebugType=None -p:DebugSymbols=false
     if ($LASTEXITCODE) { throw 'Publish failed.' }
+    if ($SelfContained) { & (Join-Path $PSScriptRoot 'Copy-RuntimeNotices.ps1') -Destination $output -Runtime $Runtime -Dotnet $Dotnet }
     Copy-Item LICENSE,NOTICE,PRIVACY.md,THIRD_PARTY_NOTICES.md -Destination $output
     Compress-Archive -Path "$output/*" -DestinationPath "$output.zip" -Force
     Get-FileHash "$output.zip" -Algorithm SHA256 | Format-List

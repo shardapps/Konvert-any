@@ -11,6 +11,7 @@ $stage = Join-Path $root "artifacts/msix-stage-$Architecture"
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 & $Dotnet publish (Join-Path $root 'src/Konvert') -c Release -r "win-$Architecture" --self-contained true -o $stage -p:DebugType=None -p:DebugSymbols=false
 if ($LASTEXITCODE) { throw 'Publish failed.' }
+& (Join-Path $PSScriptRoot 'Copy-RuntimeNotices.ps1') -Destination $stage -Runtime "win-$Architecture" -Dotnet $Dotnet
 Copy-Item (Join-Path $root 'packaging/Assets') $stage -Recurse -Force
 foreach ($name in @('LICENSE','NOTICE','PRIVACY.md','THIRD_PARTY_NOTICES.md')) { Copy-Item (Join-Path $root $name) $stage }
 $document = [xml](Get-Content (Join-Path $root 'packaging/AppxManifest.xml') -Raw)
