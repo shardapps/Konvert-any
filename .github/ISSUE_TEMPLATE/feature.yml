@@ -1,0 +1,17 @@
+name: Feature or format request
+description: Propose a useful workflow or conversion
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: For conversions, include source/target formats and acceptable fidelity loss.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior and alternatives
+    validations:
+      required: true

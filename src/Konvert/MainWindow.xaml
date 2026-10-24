@@ -1,0 +1,44 @@
+<Window x:Class="Konvert.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{StaticResource {x:Type Window}}" Title="Konvert" Width="820" Height="740" MinWidth="720" MinHeight="680" WindowStartupLocation="CenterScreen" AllowDrop="True" Drop="OnDrop" DragOver="OnDragOver" PreviewKeyDown="OnKeyDown">
+  <Grid Margin="30,22">
+    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <DockPanel>
+      <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+        <Border Background="#83E8F5" Width="34" Height="34" CornerRadius="11" Margin="0,0,12,0"><TextBlock Text="K" FontWeight="Bold" FontSize="21" Foreground="#101A22" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
+        <StackPanel><TextBlock Text="Konvert" FontWeight="SemiBold" FontSize="20" /><TextBlock Text="BY SHARDAPPS" Foreground="{DynamicResource Muted}" FontSize="9" FontWeight="SemiBold" /></StackPanel>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="Open file" Click="OnOpen" Margin="0,0,8,0" ToolTip="Choose one file (Ctrl+O)" /><Button Content="Settings" Click="OnSettings" ToolTip="Output folder, image quality and optional engines" /></StackPanel>
+    </DockPanel>
+    <Grid Grid.Row="1" Margin="0,18,0,0">
+      <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+      <StackPanel HorizontalAlignment="Center">
+        <TextBlock Text="A new form. One click away." FontSize="28" FontWeight="SemiBold" HorizontalAlignment="Center" />
+        <TextBlock x:Name="Subtitle" Text="Drop a file. Choose its next form." Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" Margin="0,8,0,0" />
+      </StackPanel>
+      <Viewbox Grid.Row="1" Stretch="Uniform" MaxHeight="440" Margin="0,10">
+        <Canvas x:Name="Orbit" Width="620" Height="430">
+          <Ellipse Width="360" Height="360" Canvas.Left="130" Canvas.Top="35" Stroke="#263440" StrokeThickness="1" StrokeDashArray="3 7" />
+          <Ellipse Width="260" Height="260" Canvas.Left="180" Canvas.Top="85" Stroke="#1D303A" StrokeThickness="1" />
+          <Border Width="180" Height="150" Canvas.Left="220" Canvas.Top="140" Background="#1B2731" BorderBrush="#476571" BorderThickness="1" CornerRadius="38">
+            <StackPanel VerticalAlignment="Center" Margin="12">
+              <TextBlock x:Name="FileType" Text="↗" FontSize="32" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" HorizontalAlignment="Center" />
+              <TextBlock x:Name="FileName" Text="Your next conversion" FontSize="12" TextTrimming="CharacterEllipsis" TextAlignment="Center" Margin="0,8,0,0" />
+              <TextBlock x:Name="FileSize" Text="Starts with a file" FontSize="11" Foreground="{DynamicResource Muted}" TextAlignment="Center" Margin="0,5,0,0" />
+            </StackPanel>
+          </Border>
+          <Button x:Name="EmptyOpen" Content="Choose a file  +" Width="160" Canvas.Left="230" Canvas.Top="327" Click="OnOpen" />
+        </Canvas>
+      </Viewbox>
+      <StackPanel Grid.Row="2" Margin="0,0,0,14">
+        <TextBlock x:Name="FormatHint" Text="Images · documents · tables · audio · video" Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+        <StackPanel x:Name="Pagination" Orientation="Horizontal" HorizontalAlignment="Center" Visibility="Collapsed" Margin="0,8,0,0"><Button Content="← Previous" Click="OnPrevious" /><TextBlock x:Name="PageLabel" Margin="14,10" /><Button Content="Next →" Click="OnNext" /></StackPanel>
+      </StackPanel>
+    </Grid>
+    <Border Grid.Row="2" Background="{DynamicResource Surface}" CornerRadius="16" Padding="18,14" BorderBrush="#2A3541" BorderThickness="1">
+      <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+        <StackPanel><TextBlock x:Name="StatusTitle" Text="Local files. Local conversions." FontWeight="SemiBold" /><TextBlock x:Name="StatusDetail" Text="No uploads, accounts, ads or background service." Foreground="{DynamicResource Muted}" FontSize="12" Margin="0,5,15,0" TextWrapping="Wrap" /><ProgressBar x:Name="Progress" IsIndeterminate="True" Height="3" Foreground="{DynamicResource Accent}" Visibility="Collapsed" Margin="0,12,16,0" /></StackPanel>
+        <StackPanel Grid.Column="1" VerticalAlignment="Center"><Button x:Name="CancelButton" Content="Cancel" Click="OnCancel" Visibility="Collapsed" /><Button x:Name="RevealButton" Content="Show file ↗" Click="OnReveal" Visibility="Collapsed" /></StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

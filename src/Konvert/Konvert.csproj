@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>../../packaging/Assets/Konvert.ico</ApplicationIcon>
+    <AssemblyName>Konvert</AssemblyName>
+    <Description>Local file conversion from a native Windows radial menu.</Description>
+  </PropertyGroup>
+</Project>

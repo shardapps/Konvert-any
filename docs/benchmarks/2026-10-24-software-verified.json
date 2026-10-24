@@ -1,0 +1,34 @@
+{
+  "capturedUtc": "2026-10-24T17:24:05.5802989Z",
+  "runtime": "net10.0-windows",
+  "architecture": "AMD64",
+  "readyMilliseconds": 612.0,
+  "samples": [
+    {
+      "workingSetMiB": 89.65,
+      "privateMiB": 50.2,
+      "cpuMilliseconds": 562.5
+    },
+    {
+      "workingSetMiB": 89.65,
+      "privateMiB": 50.2,
+      "cpuMilliseconds": 562.5
+    },
+    {
+      "workingSetMiB": 89.65,
+      "privateMiB": 50.2,
+      "cpuMilliseconds": 562.5
+    },
+    {
+      "workingSetMiB": 89.65,
+      "privateMiB": 50.2,
+      "cpuMilliseconds": 562.5
+    },
+    {
+      "workingSetMiB": 89.66,
+      "privateMiB": 50.16,
+      "cpuMilliseconds": 562.5
+    }
+  ],
+  "limitations": "Single machine, warm desktop, unloaded app, shared runtime; GPU/compositor and external engines excluded."
+}
