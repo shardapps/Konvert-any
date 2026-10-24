@@ -21,7 +21,7 @@ Install LibreOffice and FFmpeg separately. Their executables must be on PATH or 
 dotnet run --project tests/Konvert.Tests -c Release -- --require-ffmpeg --require-office
 ```
 
-The engine suite converts generated audio/video and decodes results using FFmpeg. LibreOffice exports generated DOCX fixtures. CI requires both engines in a separate integration job. Missing optional engines are explicitly skipped in normal local runs; required flags turn missing engines into failures.
+The engine suite converts generated audio/video and decodes results using FFmpeg. LibreOffice tests generated DOCX documents, CSV-to-spreadsheet exports and ODP-to-presentation exports, including PDF and package structure checks. CI requires both engines in a separate integration job. Missing optional engines are explicitly skipped in normal local runs; required flags turn missing engines into failures.
 
 ## Packaging
 

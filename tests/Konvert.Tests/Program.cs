@@ -200,6 +200,24 @@ internal static class Program
                     True(result.OutputBytes > 0);
                     if (extension == "pdf") True(File.ReadAllText(result.OutputPath).StartsWith("%PDF-"));
                 });
+            await TestAsync("LibreOffice spreadsheet exports XLSX, ODS and PDF", async () =>
+            {
+                var table = Put("office-table.csv", "item,quantity\nalpha,2\n");
+                var xlsx = await documents.ConvertAsync(table, "xlsx", new());
+                using (var archive = ZipFile.OpenRead(xlsx.OutputPath)) True(archive.GetEntry("xl/workbook.xml") is not null);
+                var ods = await documents.ConvertAsync(xlsx.OutputPath, "ods", new());
+                using (var archive = ZipFile.OpenRead(ods.OutputPath)) True(archive.GetEntry("content.xml") is not null);
+                var pdf = await documents.ConvertAsync(xlsx.OutputPath, "pdf", new());
+                True(File.ReadAllText(pdf.OutputPath).StartsWith("%PDF-"));
+            });
+            await TestAsync("LibreOffice presentation exports PPTX and PDF", async () =>
+            {
+                var presentation = MakeOdp();
+                var pptx = await documents.ConvertAsync(presentation, "pptx", new());
+                using (var archive = ZipFile.OpenRead(pptx.OutputPath)) True(archive.GetEntry("ppt/presentation.xml") is not null);
+                var pdf = await documents.ConvertAsync(pptx.OutputPath, "pdf", new());
+                True(File.ReadAllText(pdf.OutputPath).StartsWith("%PDF-"));
+            });
         }
         else if (args.Contains("--require-office")) { failures++; Console.WriteLine("FAIL LibreOffice is required but missing"); }
         else Console.WriteLine("SKIP optional LibreOffice integration (not installed)");
@@ -222,6 +240,16 @@ internal static class Program
         var source = BitmapSource.Create(32, 24, 96, 96, PixelFormats.Bgra32, null, data, 32 * 4);
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(source));
         using var stream = File.Create(path); encoder.Save(stream); return path;
+    }
+    private static string MakeOdp()
+    {
+        var path = Path.Combine(Root, "slides.odp");
+        using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
+        Add("mimetype", "application/vnd.oasis.opendocument.presentation");
+        Add("META-INF/manifest.xml", "<manifest:manifest xmlns:manifest=\"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0\" manifest:version=\"1.2\"><manifest:file-entry manifest:full-path=\"/\" manifest:media-type=\"application/vnd.oasis.opendocument.presentation\"/><manifest:file-entry manifest:full-path=\"content.xml\" manifest:media-type=\"text/xml\"/></manifest:manifest>");
+        Add("content.xml", "<office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" xmlns:svg=\"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0\" xmlns:presentation=\"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0\" office:version=\"1.2\"><office:body><office:presentation><draw:page draw:name=\"page1\"><draw:frame svg:x=\"2cm\" svg:y=\"2cm\" svg:width=\"20cm\" svg:height=\"5cm\" presentation:class=\"title\"><draw:text-box><text:p>Konvert integration fixture</text:p></draw:text-box></draw:frame></draw:page></office:presentation></office:body></office:document-content>");
+        return path;
+        void Add(string name, string content) { using var writer = new StreamWriter(archive.CreateEntry(name, CompressionLevel.NoCompression).Open(), new UTF8Encoding(false)); writer.Write(content); }
     }
     private static string Put(string name, string text) { var path = Path.Combine(Root, name); File.WriteAllText(path, text); return path; }
     private static Task Test(string name, Action action) => TestAsync(name, () => { action(); return Task.CompletedTask; });
