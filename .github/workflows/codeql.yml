@@ -26,7 +26,7 @@ jobs:
           languages: csharp
           build-mode: manual
       - run: dotnet build Konvert.sln -c Release
-      - uses: github/codeql-action/analyze@5c8ea125689a2c5ae2672d1d914ac4bcd95d1b4b
+      - uses: github/codeql-action/analyze@4bfa242aa49c5f7c6770b98670d354a7dfac05f8
   native:
     name: Native listener security
     runs-on: windows-2025
@@ -41,6 +41,6 @@ jobs:
           languages: cpp
           build-mode: manual
       - run: ./scripts/Build-NativeHost.ps1 -Architecture x64
-      - uses: github/codeql-action/analyze@5c8ea125689a2c5ae2672d1d914ac4bcd95d1b4b
+      - uses: github/codeql-action/analyze@4bfa242aa49c5f7c6770b98670d354a7dfac05f8
         with:
           category: native-listener
