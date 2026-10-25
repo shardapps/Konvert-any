@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory)][string]$IdentityName,
     [Parameter(Mandatory)][string]$Publisher,
-    [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')][string]$Version = '0.1.0.0',
+    [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')][string]$Version = '0.2.0.0',
     [ValidateSet('x64','arm64')][string]$Architecture = 'x64',
     [string]$Dotnet = 'dotnet'
 )
@@ -11,6 +11,8 @@ $stage = Join-Path $root "artifacts/msix-stage-$Architecture"
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 & $Dotnet publish (Join-Path $root 'src/Konvert') -c Release -r "win-$Architecture" --self-contained true -o $stage -p:DebugType=None -p:DebugSymbols=false
 if ($LASTEXITCODE) { throw 'Publish failed.' }
+& (Join-Path $PSScriptRoot 'Build-NativeHost.ps1') -Architecture $Architecture
+Copy-Item (Join-Path $root "artifacts/native-$Architecture/KonvertHost.exe") -Destination $stage -Force
 & (Join-Path $PSScriptRoot 'Copy-RuntimeNotices.ps1') -Destination $stage -Runtime "win-$Architecture" -Dotnet $Dotnet
 Copy-Item (Join-Path $root 'packaging/Assets') $stage -Recurse -Force
 foreach ($name in @('LICENSE','NOTICE','PRIVACY.md','THIRD_PARTY_NOTICES.md')) { Copy-Item (Join-Path $root $name) $stage }

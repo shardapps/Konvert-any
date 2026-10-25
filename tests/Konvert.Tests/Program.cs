@@ -24,15 +24,47 @@ internal static class Program
 
     private static async Task RunAsync(string[] args)
     {
-        await Test("Both windows apply the dark theme to their derived Window types", () =>
+        await Test("Glass defaults, frameless popup and custom settings windows", () =>
         {
             var app = new App { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
             app.InitializeComponent();
-            var window = new MainWindow();
+            var window = new MainWindow(preferences: new());
+            var popup = new MainWindow("sample.docx", preferences: new());
             var settingsWindow = new SettingsWindow(new(), new(null, null, new HashSet<string>()));
-            Equal(Color.FromRgb(17, 22, 28), ((SolidColorBrush)window.Background).Color);
-            Equal(Color.FromRgb(17, 22, 28), ((SolidColorBrush)settingsWindow.Background).Color);
-            settingsWindow.Close(); window.Close();
+            True(((SolidColorBrush)window.Background).Color.A < 255);
+            Equal(System.Windows.WindowStyle.None, settingsWindow.WindowStyle);
+            True(popup.AllowsTransparency); True(popup.ShowInTaskbar);
+            Equal(560.0, popup.Width); Equal(560.0, popup.Height);
+            settingsWindow.Close(); popup.Close(); window.Close();
+        });
+        await Test("Seven persistent themes and high contrast fallback", () =>
+        {
+            Equal(7, ThemeManager.Themes.Count);
+            foreach (var theme in ThemeManager.Themes)
+            {
+                var resources = new System.Windows.ResourceDictionary();
+                ThemeManager.Apply(theme.Id, resources, false);
+                Equal(theme.Id, ThemeManager.Current.Id);
+                True(resources["Ink"] is SolidColorBrush);
+                Equal(theme.Id, (new ConversionSettings { Theme = theme.Id }).Validate().Theme);
+            }
+            var contrast = new System.Windows.ResourceDictionary();
+            ThemeManager.Apply("glass", contrast, true);
+            Equal(System.Windows.SystemColors.WindowBrush, contrast["Surface"]);
+            Equal("glass", (new ConversionSettings { Theme = "invalid" }).Validate().Theme);
+        });
+        await Test("Popup clamps to negative-coordinate and small monitor work areas", () =>
+        {
+            var left = WindowEffects.Clamp(-1910, 10, 560, 560, -1920, 0, 0, 1080);
+            Equal(-1910.0, left.Left); Equal(10.0, left.Top);
+            var right = WindowEffects.Clamp(1910, 1070, 560, 560, 0, 0, 1920, 1080);
+            Equal(1350.0, right.Left); Equal(510.0, right.Top);
+        });
+        await Test("Unavailable office routes explain engine setup rather than disappearing", () =>
+        {
+            var catalog = new FormatRegistry(new(null, null, new HashSet<string>())).GetOptions("sample.docx");
+            True(catalog.Any(option => option.Target.Extension == "pdf" && !option.Available));
+            True(catalog.Any(option => option.Target.Extension == "txt" && option.Available));
         });
         var none = new EngineCapabilities(null, null, new HashSet<string>());
         using var service = new ConversionService(none);

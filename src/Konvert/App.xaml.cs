@@ -5,11 +5,23 @@ namespace Konvert;
 
 public partial class App : Application
 {
+    private Mutex? uiMutex;
     protected override async void OnStartup(StartupEventArgs e)
     {
         // This small, mostly static picker does not need a dedicated GPU rendering pipeline.
         System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
         base.OnStartup(e);
+        if (e.Args.FirstOrDefault() is "--install-integration" or "--remove-integration")
+        {
+            try
+            {
+                if (e.Args[0] == "--install-integration") ShellIntegration.Enable();
+                else { NativeHostIntegration.Stop(); ShellIntegration.Remove(); }
+                Shutdown(0);
+            }
+            catch { Shutdown(1); }
+            return;
+        }
         if (e.Args.FirstOrDefault() is "--convert" or "--formats" or "--help")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -18,11 +30,27 @@ public partial class App : Application
             Shutdown(exitCode);
             return;
         }
-        var input = e.Args.FirstOrDefault(arg => !arg.StartsWith("--", StringComparison.Ordinal));
-        var window = new MainWindow(input);
+        string? input = null;
+        double? x = null, y = null;
+        for (var i = 0; i < e.Args.Length; i++)
+        {
+            if (e.Args[i] is "--anchor-x" or "--anchor-y" && i + 1 < e.Args.Length)
+            {
+                if (double.TryParse(e.Args[++i], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var coordinate) && double.IsFinite(coordinate))
+                {
+                    if (e.Args[i - 1] == "--anchor-x") x = coordinate; else y = coordinate;
+                }
+            }
+            else if (!e.Args[i].StartsWith("--", StringComparison.Ordinal)) input = e.Args[i];
+        }
+        ThemeManager.Apply(new SettingsStore().Load().Theme, Resources);
+        uiMutex = new Mutex(false, "Local\\Shardapps.Konvert.UI");
+        var window = new MainWindow(input, x.HasValue && y.HasValue ? new(x.Value, y.Value) : null, e.Args.Contains("--settings"));
         MainWindow = window;
         window.Show();
     }
+
+    protected override void OnExit(ExitEventArgs e) { uiMutex?.Dispose(); base.OnExit(e); }
 
     private static async Task<int> RunCommandAsync(string[] args)
     {
@@ -30,7 +58,7 @@ public partial class App : Application
         {
             if (args[0] == "--help")
             {
-                Console.WriteLine("Konvert 0.1 alpha | --formats <file> | --convert <file> --to <format> [--output <folder>]\nWithout a command, opens the native conversion menu. Existing files are never overwritten.");
+                Console.WriteLine("Konvert 0.2 alpha | --formats <file> | --convert <file> --to <format> [--output <folder>]\nPass a file to open its radial popup. Ctrl+K works in Explorer with KonvertHost running. --settings opens preferences. Existing files are never overwritten.");
                 return 0;
             }
             if (args.Length < 2) throw new ArgumentException("Supply an input file.");
