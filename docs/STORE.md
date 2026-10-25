@@ -2,7 +2,7 @@
 
 Product brand: **Shardapps**. Existing sibling apps identify the Store publisher as **ShardCoders**. Konvert's actual Partner Center identity and publisher certificate subject must come from the owner's reserved product; they cannot be inferred from a display name.
 
-`packaging/AppxManifest.xml` is a full-trust desktop package with Windows 11 minimum and an execution alias. `Build-Msix.ps1` publishes self-contained x64/ARM64 binaries, adds required logos/notices, fills explicit identity/publisher/version values and runs MakeAppx's validation. Development packages are unsigned. There is no upload, production secret, auto-publish workflow or fabricated Store product ID.
+`packaging/AppxManifest.xml` is a full-trust desktop package with Windows 11 minimum and an execution alias. `Build-Msix.ps1` publishes self-contained x64/ARM64 binaries and the native listener, adds required logos/notices, fills explicit identity/publisher/version values and runs MakeAppx's validation. Development packages are unsigned. There is no upload, production secret, auto-publish workflow or fabricated Store product ID. The conventional setup EXE is the primary 0.2 testing distribution. Packaged startup registration must be implemented with the appropriate manifest extension rather than the setup EXE's user Run entry.
 
 Before Store submission:
 
