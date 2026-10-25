@@ -33,7 +33,7 @@ internal static class Program
             var settingsWindow = new SettingsWindow(new(), new(null, null, new HashSet<string>()));
             True(((SolidColorBrush)window.Background).Color.A < 255);
             Equal(System.Windows.WindowStyle.None, settingsWindow.WindowStyle);
-            True(popup.AllowsTransparency); True(!popup.ShowInTaskbar);
+            True(popup.AllowsTransparency); True(popup.ShowInTaskbar);
             Equal(560.0, popup.Width); Equal(560.0, popup.Height);
             settingsWindow.Close(); popup.Close(); window.Close();
         });

@@ -6,7 +6,9 @@ $workspace=[IO.Path]::GetFullPath($root).TrimEnd('\')+'\'
 if (!$target.StartsWith($workspace,[StringComparison]::OrdinalIgnoreCase)) { throw 'Installer test target is outside the workspace.' }
 $setup=(Resolve-Path -LiteralPath $Installer).Path
 function Install-TestCopy {
-    $process=Start-Process -FilePath $setup -ArgumentList ('/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR="'+$target+'" /TASKS="!startup,!integration,!desktopicon"') -Wait -PassThru
+    # Wait only for setup, not its intentionally persistent listener descendant.
+    $process=Start-Process -FilePath $setup -ArgumentList ('/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR="'+$target+'" /TASKS="!startup,!integration,!desktopicon"') -PassThru
+    if (!$process.WaitForExit(180000)) { throw 'Setup did not finish within three minutes.' }
     if ($process.ExitCode) { throw "Setup failed: $($process.ExitCode)" }
     foreach ($name in @('Konvert.exe','KonvertHost.exe','hostfxr.dll','unins000.exe','licenses')) {
         if (!(Test-Path -LiteralPath (Join-Path $target $name))) { throw "Installed payload missing $name" }
@@ -24,7 +26,8 @@ try {
 } finally {
     $uninstall=Join-Path $target 'unins000.exe'
     if (Test-Path -LiteralPath $uninstall) {
-        $process=Start-Process $uninstall -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -Wait -PassThru
+        $process=Start-Process $uninstall -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -PassThru
+        if (!$process.WaitForExit(60000)) { throw 'Uninstall did not finish within one minute.' }
         if ($process.ExitCode) { throw 'Uninstall failed.' }
     }
 }

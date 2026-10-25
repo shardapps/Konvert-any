@@ -42,14 +42,14 @@ public partial class MainWindow : Window
         if (popup)
         {
             Width = Height = 560; AllowsTransparency = true; Background = Brushes.Transparent;
-            ShowInTaskbar = false; Topmost = true; WindowStartupLocation = WindowStartupLocation.Manual;
+            ShowInTaskbar = true; Topmost = true; WindowStartupLocation = WindowStartupLocation.Manual;
             Title = "Konvert · quick convert"; BuildPopup();
         }
         else
         {
             Width = 790; Height = 560; ShowInTaskbar = true; BuildHome();
         }
-        SourceInitialized += (_, _) => { if (popup) WindowEffects.PlacePopup(this, anchor); else WindowEffects.ApplyBackdrop(this); };
+        SourceInitialized += (_, _) => { if (!popup) WindowEffects.ApplyBackdrop(this); };
         Activated += (_, _) => activated = true;
         Deactivated += (_, _) => { if (popup && activated && !busy && !modal) Close(); };
         PreviewKeyDown += OnKeyDown;
