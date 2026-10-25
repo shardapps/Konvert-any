@@ -18,12 +18,12 @@ internal static class ShellIntegration
         RemoveOwnedPath(tracking);
         using var key = Registry.CurrentUser.CreateSubKey(ShellKey);
         key.SetValue("", "Konvert"); key.SetValue("Icon", executable); key.SetValue("MultiSelectModel", "Single");
-        using var command = key.CreateSubKey("command"); command.SetValue("", $"\"{executable}\" \"%1\"");
+        using var command = key.CreateSubKey("command"); command.SetValue("", $"\"{executable}\" --popup \"%1\"");
         var directory = Path.GetDirectoryName(executable)!;
         var userPath = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User) ?? "";
         if (!userPath.Split(';').Any(item => SamePath(item, directory)))
         {
-            Environment.SetEnvironmentVariable("PATH", string.IsNullOrEmpty(userPath) ? directory : userPath.TrimEnd(';') + ";" + directory, EnvironmentVariableTarget.User);
+            Environment.SetEnvironmentVariable("PATH", string.IsNullOrEmpty(userPath) ? directory : directory + ";" + userPath.TrimStart(';'), EnvironmentVariableTarget.User);
             tracking.SetValue("OwnedPath", directory);
         }
         Broadcast();
@@ -32,9 +32,17 @@ internal static class ShellIntegration
     public static void Remove()
     {
         EnsureUnpackaged();
-        Registry.CurrentUser.DeleteSubKeyTree(ShellKey, false);
+        var executable = Environment.ProcessPath ?? throw new IOException("Cannot locate Konvert.exe.");
+        using (var command = Registry.CurrentUser.OpenSubKey(ShellKey + @"\command"))
+        {
+            if (command?.GetValue("") is string value && value.StartsWith($"\"{executable}\"", StringComparison.OrdinalIgnoreCase))
+            {
+                command.Close();
+                Registry.CurrentUser.DeleteSubKeyTree(ShellKey, false);
+            }
+        }
         using var tracking = Registry.CurrentUser.OpenSubKey(TrackingKey, true);
-        if (tracking is not null) RemoveOwnedPath(tracking);
+        if (tracking?.GetValue("OwnedPath") is string directory && SamePath(directory, Path.GetDirectoryName(executable)!)) RemoveOwnedPath(tracking);
         Broadcast();
     }
     private static void RemoveOwnedPath(RegistryKey tracking)

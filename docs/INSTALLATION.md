@@ -1,21 +1,33 @@
 # Installation and removal
 
-The first alpha targets Windows 11. Choose x64 for Intel/AMD Windows or ARM64 for Windows on Arm. ARM64 is cross-built; physical hardware validation remains pending.
+Konvert 0.2 alpha targets Windows 11. Choose x64 for Intel/AMD or ARM64 for Windows on Arm. Both setup EXEs include their architecture's .NET Desktop Runtime and native listener. ARM64 is cross-built; physical hardware verification remains pending. GitHub previews are unsigned.
 
-## Portable
+## Setup EXE
 
-Download a successful CI ZIP (GitHub sign-in needed for workflow artifacts) or a published release, when available. Extract the entire ZIP. Compact builds require the matching **.NET 10 Desktop Runtime**, not only the base .NET Runtime. Standalone builds include the runtime and are larger. Open `Konvert.exe`.
+Run the matching setup from Releases or CI. The default per-user directory is **%LOCALAPPDATA%\\Programs\\Shardapps\\Konvert**, following Screen's Shardapps folder convention. Setup creates a Start menu shortcut, registers uninstall in Windows Settings → Apps, and offers Explorer/PATH integration, startup at sign-in and a desktop shortcut.
 
-To add Explorer/PATH integration, place the extracted folder permanently first. Select **Settings → Enable Explorer + PATH**. This registers only the current user's `Software\Classes\*\shell\Shardapps.Konvert` command and adds the app directory to user PATH if absent. No administrator rights or default file association change are needed. Windows 11 shows the portable entry under **Show more options**. Open a new terminal to pick up PATH. Only one selected file is supported.
+The native listener starts after installation. Select one file in Explorer or on the desktop and press Ctrl+K. PATH alone cannot provide a global shortcut: the listener must be running. It registers Ctrl+K only while Explorer/desktop is active and yields it to other applications. The popup opens around the selected item, clamped to the monitor work area. Escape, the dismiss button and clicking outside close an idle popup.
 
-For removal, select **Settings → Remove integration**, close the app, then delete its portable folder. This removes Konvert's command and only the PATH entry Konvert recorded adding. Your converted files remain. Preferences may be deleted manually from `%LOCALAPPDATA%\Shardapps\Konvert` if wanted. If you move the app, remove integration before moving and re-enable afterward.
+Windows 11 shows the installer/portable Explorer command under **Show more options**. A modern packaged Explorer extension remains future work. Open a new terminal after PATH changes. The installer prepends its own directory, preserving unrelated PATH entries and removing only a previous entry Konvert recorded owning.
+
+Run setup again for upgrade/repair. Close any visible conversion/settings windows first; setup stops the native listener before replacing files. Converted outputs and local preferences are preserved.
 
 ## Optional engines
 
-Download [LibreOffice](https://www.libreoffice.org/download/download-libreoffice/) for office exports and [FFmpeg](https://ffmpeg.org/download.html) for audio/video. Use trusted upstream-linked builds. Konvert does not install or bundle these engines. Select exact `soffice.exe` / `ffmpeg.exe` paths in Settings, or restart after adding them to PATH. [Formats and fidelity](FORMATS.md).
+Native images, text, tables and DOCX text work without additional engines. For DOCX-to-PDF and other office exports, install [LibreOffice](https://www.libreoffice.org/download/download-libreoffice/). For audio/video, use a trusted [FFmpeg build](https://ffmpeg.org/download.html).
 
-## MSIX and Microsoft Store
+Settings → Converters shows availability, download links and executable path pickers. Missing-engine popup options open that page. Set an explicit path to soffice.exe or ffmpeg.exe, save, then reopen the popup. Program Files and absolute PATH directories are also detected. The engines are not included in setup and have separate licenses.
 
-The repository includes unsigned development MSIX packaging. A development-identity MSIX is not a Store release and is not the recommended user install. No Konvert Store listing exists yet. Do not disable Windows protections to install an unsigned preview; use the portable ZIP for normal testing.
+## Portable ZIP
 
-Packaged installs use the manifest's `konvert.exe` execution alias and Windows-managed installation lifecycle. Manual registry/PATH integration is disabled for packaged processes. A modern packaged Explorer command still requires an IExplorerCommand extension; it is planned and intentionally not misrepresented as working. [Store checklist](STORE.md).
+Extract the entire self-contained ZIP and run Konvert.exe. Keep KonvertHost.exe and licenses/ beside it. It starts the shortcut listener when you open the UI. Register Explorer/PATH in Settings → Windows only after placing the folder permanently. Optional sign-in startup is available there as well.
+
+## Uninstall
+
+Use Windows Settings → Apps → Konvert → Uninstall. Setup stops its listener and removes its files, shortcuts, startup registration and owned integration. It does not delete converted files or preferences. A sandbox/different-copy uninstall does not remove another copy's recorded Explorer/PATH integration.
+
+For a portable copy, stop the listener from its tray menu, remove Explorer/PATH and sign-in startup in Settings, then remove the portable folder. Preferences may be removed separately from %LOCALAPPDATA%\\Shardapps\\Konvert if wanted.
+
+## Microsoft Store
+
+Konvert is not published to Microsoft Store yet. Unsigned development MSIX packages are for packaging validation, not ordinary installation. Partner Center identity, Store startup registration, modern packaged Explorer integration, certification and signing remain release work. [Store checklist](STORE.md).

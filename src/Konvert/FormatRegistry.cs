@@ -2,6 +2,18 @@ namespace Konvert;
 
 public sealed class FormatRegistry(EngineCapabilities capabilities)
 {
+    public IReadOnlyList<ConversionOption> GetOptions(string path)
+    {
+        var available = GetTargets(path);
+        var full = capabilities with
+        {
+            LibreOffice = capabilities.LibreOffice ?? "not-installed",
+            Ffmpeg = capabilities.Ffmpeg ?? "not-installed",
+            Encoders = new HashSet<string>(["libmp3lame", "pcm_s16le", "flac", "libvorbis", "aac", "libopus", "libx264", "libvpx-vp9", "gif"])
+        };
+        return new FormatRegistry(full).GetTargets(path)
+            .Select(target => new ConversionOption(target, available.Any(route => route.Extension == target.Extension))).ToArray();
+    }
     public static readonly string[] Images = ["png", "jpg", "jpeg", "bmp", "gif", "tif", "tiff", "ico", "wdp"];
     public static readonly string[] Text = ["txt", "md", "log", "json", "xml", "yaml", "yml", "csv", "tsv", "html", "htm", "css", "js", "cs", "py", "sql"];
     public static readonly string[] Documents = ["docx", "doc", "odt", "rtf", "txt"];

@@ -1,32 +1,38 @@
 # Architecture
 
-Konvert is a .NET 10/WPF Windows application. There is no web view, server or background service. The native UI is a file-centric orbital picker with six format buttons per page. It uses software WPF rendering to reduce the footprint of a mostly static interface. Controls remain keyboard reachable and labeled for UI Automation.
+Konvert 0.2 separates the persistent shortcut from the transient conversion UI.
 
 ```mermaid
 flowchart LR
-    A[File picker / drop / Explorer / arguments] --> B[Format registry]
-    C[Optional engine discovery] --> B
-    B --> D[Conversion service: one heavy job]
-    D --> E[STA image / text worker]
-    D --> F[LibreOffice / FFmpeg child process]
-    E --> G[Staged output]
-    F --> G
-    G --> H[Atomic move without overwrite]
-    I[Local settings] --> D
+    A[Explorer / desktop foreground event] --> B[Native C++ listener]
+    B -->|Ctrl+K: query selected file| C[Windows Shell COM]
+    C --> D[Transient WPF radial popup]
+    E[Explorer command / file arguments / chooser] --> D
+    D --> F[Format registry and converter availability]
+    F --> G[One heavy conversion per process]
+    G --> H[STA native worker / async engine process]
+    H --> I[Staged output]
+    I --> J[Atomic no-overwrite move]
 ```
 
-`MainWindow` coordinates selection, progress and cancellation on WPF's dispatcher. `FormatRegistry` describes routes, and `EngineCapabilities` checks local availability and FFmpeg encoder requirements. Probing runs off the dispatcher. `ConversionService` serializes heavy operations with a semaphore and runs native work on a short-lived STA worker, needed by WPF image APIs. External processes are asynchronous, with concurrent bounded pipe draining, deadlines, and process-tree cancellation.
+## Native listener
 
-Input checks precede staging. Work is written beside the eventual output under a random temporary name. The final move never overwrites, retries numbered names on collision, and stays within the same volume. `finally` blocks remove staging and release the gate. Office exports use an isolated temporary profile; macro security is highest. There is no destructive input write.
+KonvertHost.exe is C++20/Win32, statically linked with the C runtime. It registers Ctrl+K only for Explorer/desktop foreground windows. SetWinEventHook delivers foreground events without polling; RegisterHotKey receives the shortcut without a low-level keyboard recorder. Windows Shell COM provides one selected filesystem item and its view position. Empty Explorer selections never fall back to unrelated desktop selections.
 
-The image pipeline reads dimensions before decoding, renders one normalized pixel surface and encodes it without a managed full-image copy buffer. Streaming text uses 8 KiB character chunks and preserves surrogate pairs across chunk boundaries. CSV/TSV parsing yields one row at a time rather than retaining a second whole-table representation; bounded input text and the JSON DOM still occupy memory. Child-process diagnostics retain at most 64 KiB per pipe while continuing to drain.
+The listener sleeps in GetMessage when idle. It exposes tray open/settings/pause/quit controls, uses a named mutex to avoid duplicates, bounds concurrent popup launching, and waits for process exit when asked to stop during setup. It records no clipboard contents, keyboard stream or selection history.
+
+## UI and themes
+
+The managed application is .NET 10/WPF with software rendering. A file argument opens the frameless, per-pixel transparent radial popup; no file opens home/onboarding. Popup placement is monitor/work-area aware and clamped. The managed process exits after its windows close, while the separately controlled native listener remains.
+
+ThemeManager supplies seven color systems and system high contrast fallback. App.xaml contains original templates for buttons, sliders, switches, text boxes and scrollbars. IconControl renders original 24-unit vector paths. Settings previews themes and commits only on Save; cancellation restores the original theme. No screen-capture/refraction shader or permanent animation timer is used.
+
+## Conversion safety
+
+FormatRegistry distinguishes supported routes from routes requiring engine setup. ConversionService executes only available routes. A semaphore bounds one heavy job per managed process. Native work uses a short-lived STA worker; engines use argument lists, concurrent bounded diagnostic draining, deadlines and process-tree cancellation.
+
+Output is staged beside the destination, then moved without overwrite with numbered collision suffixes. The original is never written. Office exports use an isolated profile with macro security at its highest level. Text streams in bounded chunks; CSV/TSV rows are yielded; image dimensions and table input have explicit limits. [Format fidelity](FORMATS.md).
 
 ## Adding a format
 
-1. Add a justified route to `FormatRegistry`, with accurate engine and fidelity description.
-2. Implement the conversion through `ConversionService` or a focused provider; preserve staging, cancellation and errors.
-3. Probe optional capabilities instead of assuming installation equals codec support.
-4. Test a real output, failure cleanup, original protection and relevant data loss or malformed input cases.
-5. Update format docs, README, project facts and changelog. Keep the binary dependency budget visible.
-
-Current limits: extension-based discovery, single selected file, per-process concurrency bound, non-interruptible native codec calls, first image frame, no global instance broker or sandbox. These are deliberate alpha boundaries, not permanent architectural guarantees.
+Add an accurate route, engine/capability detection, cancellation/cleanup handling, real output tests and fidelity documentation. Update README, project facts and changelog. Preserve per-process concurrency bounds and avoid idle work.

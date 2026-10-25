@@ -23,6 +23,12 @@ jobs:
       - run: dotnet build Konvert.sln -c Release --no-restore
       - run: dotnet format Konvert.sln --verify-no-changes --no-restore
       - run: dotnet run --project tests/Konvert.Tests -c Release --no-build
+      - name: Compile and test native shortcut listener
+        shell: pwsh
+        run: |
+          ./scripts/Build-NativeHost.ps1 -Architecture x64
+          $test = Start-Process artifacts/native-x64/KonvertHost.exe -ArgumentList '--self-test' -Wait -PassThru
+          if ($test.ExitCode) { throw 'Native listener tests failed.' }
       - name: Dependency audit
         shell: pwsh
         run: |
@@ -60,7 +66,13 @@ jobs:
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
         with:
           dotnet-version: '10.0.x'
-      - run: ./scripts/Build.ps1 -Runtime win-${{ matrix.arch }}
+      - run: ./scripts/Build.ps1 -Runtime win-${{ matrix.arch }} -SelfContained
+      - name: Install packaging compiler
+        run: choco install innosetup --yes --no-progress --limit-output
+      - run: ./scripts/Build-Installer.ps1 -Architecture ${{ matrix.arch }} -PayloadDirectory artifacts/win-${{ matrix.arch }}-standalone
+      - name: Verify install, upgrade and removal
+        if: matrix.arch == 'x64'
+        run: ./scripts/Test-Installer.ps1 -Installer artifacts/installers/Konvert-Setup-0.2.0-alpha.1-x64.exe
       - run: ./scripts/Build-Msix.ps1 -Architecture ${{ matrix.arch }} -IdentityName Shardapps.Konvert.Development -Publisher CN=Shardapps.Development
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -68,5 +80,6 @@ jobs:
           path: |
             artifacts/*.zip
             artifacts/*.msix
+            artifacts/installers/*.exe
           if-no-files-found: error
           retention-days: 14
