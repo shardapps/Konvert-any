@@ -12,13 +12,9 @@ public sealed record EngineCapabilities(string? LibreOffice, string? Ffmpeg, IRe
     public static async Task<EngineCapabilities> DetectAsync(
         ConversionSettings settings, CancellationToken cancellationToken = default, string? source = null)
     {
-        var office = source is null || FormatRegistry.Uses(source, ConversionBackend.Office)
-            ? Resolve(settings.LibreOfficePath, "soffice.exe", "LibreOffice", "program")
-            : null;
-        var ffmpeg = source is null || FormatRegistry.Uses(source, ConversionBackend.Media)
-            ? Resolve(settings.FfmpegPath, "ffmpeg.exe")
-            : null;
-        if (ffmpeg is null) return new(office, null, FrozenSet<string>.Empty);
+        var installed = Locate(settings, source);
+        var ffmpeg = installed.Ffmpeg;
+        if (ffmpeg is null) return installed;
 
         var encoders = new HashSet<string>(StringComparer.Ordinal);
         try
@@ -30,9 +26,9 @@ public sealed record EngineCapabilities(string? LibreOffice, string? Ffmpeg, IRe
                 if (parts.Length > 1 && parts[0].Length == 6) encoders.Add(parts[1]);
             }
         }
-        catch (Exception ex) when (ProbeFailed(ex)) { return new(office, null, FrozenSet<string>.Empty); }
+        catch (Exception ex) when (ProbeFailed(ex)) { return installed with { Ffmpeg = null }; }
 
-        var capabilities = new EngineCapabilities(office, ffmpeg, encoders.ToFrozenSet(StringComparer.Ordinal));
+        var capabilities = installed with { Encoders = encoders.ToFrozenSet(StringComparer.Ordinal) };
         var probe = Path.Combine(Path.GetDirectoryName(ffmpeg)!, "ffprobe.exe");
         if (source is null || !File.Exists(probe) || !File.Exists(source)) return capabilities;
 
@@ -52,6 +48,17 @@ public sealed record EngineCapabilities(string? LibreOffice, string? Ffmpeg, IRe
             };
         }
         catch (Exception ex) when (ProbeFailed(ex) || ex is JsonException or KeyNotFoundException) { return capabilities; }
+    }
+
+    internal static EngineCapabilities Locate(ConversionSettings settings, string? source = null)
+    {
+        var office = source is null || FormatRegistry.Uses(source, ConversionBackend.Office)
+            ? Resolve(settings.LibreOfficePath, "soffice.exe", "LibreOffice", "program")
+            : null;
+        var ffmpeg = source is null || FormatRegistry.Uses(source, ConversionBackend.Media)
+            ? Resolve(settings.FfmpegPath, "ffmpeg.exe")
+            : null;
+        return new(office, ffmpeg, FrozenSet<string>.Empty);
     }
 
     private static bool ProbeFailed(Exception ex) =>

@@ -1,6 +1,6 @@
 # Konvert project facts
 
-Updated 2026-11-10 for 0.3.0-alpha.1. [shardapps/Konvert-any](https://github.com/shardapps/Konvert-any).
+Updated 2026-11-10 for 0.3.1-alpha.1. [shardapps/Konvert-any](https://github.com/shardapps/Konvert-any).
 
 | Field | Fact |
 | --- | --- |
@@ -11,7 +11,7 @@ Updated 2026-11-10 for 0.3.0-alpha.1. [shardapps/Konvert-any](https://github.com
 | Persistent component | Small C++20 event-driven shortcut listener with tray pause/quit |
 | Transient component | .NET 10/WPF conversion UI; no embedded browser |
 | Themes | Glass default; Pearl, Graphite, Midnight, Ocean, Lavender, Forest |
-| Installers | Compact per-user setup EXEs for x64 and ARM64. Shared .NET 10 Desktop Runtime required. |
+| Installers | Compact x64 and ARM64 setup EXEs. Runtime preflight, in-place upgrades and exact-match cleanup of known legacy files. |
 | Default install directory | %LOCALAPPDATA%\\Programs\\Shardapps\\Konvert |
 | Native conversions | Images/image PDF, raw text/HTML, DOCX text, CSV/TSV/flat JSON |
 | Optional conversions | LibreOffice office exports and FFmpeg media exports |

@@ -5,6 +5,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using Ellipse = System.Windows.Shapes.Ellipse;
 using Shape = System.Windows.Shapes.Shape;
 using System.Windows.Threading;
@@ -22,6 +23,7 @@ public partial class MainWindow : Window
     private readonly Canvas ring = new() { Width = RingSize, Height = RingSize };
     private readonly StackPanel drawer = new();
     private readonly Border drawerCard;
+    private readonly Border statusCard;
     private readonly WrapPanel extraFormats = new();
     private readonly List<Button> quickButtons = [];
     private readonly Button center;
@@ -30,18 +32,25 @@ public partial class MainWindow : Window
     private readonly TextBlock sourceLabel;
     private readonly TextBlock hint;
     private readonly TextBlock details;
+    private readonly TextBlock status;
+    private readonly TextBlock dropHint;
+    private readonly TextBlock shortcutHint;
     private readonly Button folderButton;
+    private readonly Button resetFolder;
     private readonly FrameworkElement qualityOptions;
     private readonly FrameworkElement dpiOptions;
+    private readonly Slider qualitySlider;
+    private readonly Slider dpiSlider;
     private ConversionSettings preferences;
     private ConversionSettings jobSettings;
     private FormatRegistry catalog = new(EngineCapabilities.None);
     private IReadOnlyList<ConversionOption> options = [];
     private Task? discovery;
+    private CancellationTokenSource? conversion;
     private string? input;
     private string? result;
     private string? error;
-    private bool busy, modal, closing, closeAfterCancel, activated;
+    private bool busy, modal, closing, closeAfterCancel, activated, discovering, refreshAfterJob;
 
     public MainWindow(string? initialFile = null, PopupAnchor? anchor = null, bool showSettings = false, ConversionSettings? preferences = null)
     {
@@ -59,6 +68,7 @@ public partial class MainWindow : Window
         SnapsToDevicePixels = true;
 
         Root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(RingSize) });
+        Root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Root.RowDefinitions.Add(new RowDefinition());
         Root.Children.Add(ring);
 
@@ -69,6 +79,9 @@ public partial class MainWindow : Window
         var highlight = new Ellipse { Width = 214, Height = 214, IsHitTestVisible = false };
         highlight.SetResourceReference(Shape.FillProperty, "GlassHighlight");
         Place(highlight, 112, 112, 214, 214);
+
+        dropHint = RingCaption("Drop a file here", 47);
+        shortcutHint = RingCaption("Explorer   Ctrl + K", 160);
 
         var centerContent = new StackPanel();
         centerContent.Children.Add(Ui.Icon("convert", 22, "Accent"));
@@ -87,7 +100,8 @@ public partial class MainWindow : Window
         {
             if (busy) { CancelJob(); return; }
             if (result is not null) { Reveal(); return; }
-            if (input is null) PickFile();
+            if (input is null || (!discovering && options.Count == 0)) PickFile();
+            else if (!options.Any(option => option.Available) && !discovering) SetDrawer(true);
         };
         Place(center, 112, 112, 80, 80);
 
@@ -96,6 +110,16 @@ public partial class MainWindow : Window
         expand.TabIndex = QuickSlots;
         expand.Click += (_, _) => ToggleDrawer();
         Place(expand, 112, 187, 36, 36);
+
+        status = Ui.Text("", 12);
+        status.TextWrapping = TextWrapping.Wrap;
+        status.MaxHeight = 72;
+        AutomationProperties.SetLiveSetting(status, AutomationLiveSetting.Polite);
+        statusCard = Ui.Card(status, 14, new Thickness(12, 9, 12, 9));
+        statusCard.Margin = new Thickness(0, 0, 0, 4);
+        statusCard.Visibility = Visibility.Collapsed;
+        Grid.SetRow(statusCard, 1);
+        Root.Children.Add(statusCard);
 
         details = Ui.Text("", 11, "Muted");
         details.Margin = new Thickness(0, 0, 0, 8);
@@ -109,23 +133,27 @@ public partial class MainWindow : Window
         folderButton = Ui.Button("Choose output folder", "folder", (_, _) => ChooseFolder());
         folderButton.Margin = new Thickness(0, 8, 0, 4);
         drawer.Children.Add(folderButton);
-        drawer.Children.Add(Ui.Button("Use source folder", "back", (_, _) =>
+        resetFolder = Ui.Button("Use source folder", "back", (_, _) =>
         {
             jobSettings = jobSettings with { OutputDirectory = null };
             UpdateDetails();
-        }));
+            FitToContent();
+        });
+        resetFolder.Margin = new Thickness(0, 0, 0, 4);
+        drawer.Children.Add(resetFolder);
 
-        qualityOptions = AddSlider("JPEG quality", 10, 100, jobSettings.JpegQuality, "%", value => jobSettings = jobSettings with { JpegQuality = value });
-        dpiOptions = AddSlider("Image DPI", 72, 600, jobSettings.Dpi, "", value => jobSettings = jobSettings with { Dpi = value });
+        qualityOptions = AddSlider("JPEG quality", 10, 100, jobSettings.JpegQuality, "%", value => jobSettings = jobSettings with { JpegQuality = value }, out qualitySlider);
+        dpiOptions = AddSlider("Image DPI", 72, 600, jobSettings.Dpi, "", value => jobSettings = jobSettings with { Dpi = value }, out dpiSlider);
         drawer.Children.Add(Ui.Button("Preferences", "settings", async (_, _) => await OpenSettingsAsync()));
         var optionsScroll = new ScrollViewer { Content = drawer, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         drawerCard = Ui.Card(optionsScroll, 17, new Thickness(12));
         drawerCard.Visibility = Visibility.Collapsed;
-        Grid.SetRow(drawerCard, 1);
+        Grid.SetRow(drawerCard, 2);
         Root.Children.Add(drawerCard);
 
         Title = initialFile is null ? "Konvert" : "Konvert · " + Path.GetFileName(initialFile);
         if (initialFile is not null) SetSource(initialFile);
+        else UpdatePresentation();
         Activated += (_, _) => activated = true;
         Deactivated += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
         {
@@ -147,13 +175,15 @@ public partial class MainWindow : Window
         };
         Drop += (_, e) =>
         {
-            if (!busy && e.Data.GetData(DataFormats.FileDrop) is string[] { Length: 1 } files)
-                OpenFile(files[0]);
+            if (busy || e.Data.GetData(DataFormats.FileDrop) is not string[] files) return;
+            if (files.Length == 1) OpenFile(files[0]);
+            else ShowError("Drop one file at a time.");
         };
         Loaded += async (_, _) =>
         {
             anchor = WindowEffects.PlacePopup(this, anchor, RingSize);
             Activate();
+            if (IsActive) (quickButtons.FirstOrDefault() ?? (input is null ? center : expand)).Focus();
             if (initialFile is null && File.Exists(NativeHostIntegration.HostPath))
             {
                 try { NativeHostIntegration.Start(); }
@@ -168,12 +198,13 @@ public partial class MainWindow : Window
     {
         if (!File.Exists(path))
         {
-            ShowError("This file is unavailable. Choose a local file.");
+            ShowError("This file is unavailable. Choose another file.");
             return;
         }
         input = Path.GetFullPath(path);
         sourceLabel.Text = Path.GetExtension(input).TrimStart('.').ToUpperInvariant();
         if (sourceLabel.Text.Length == 0) sourceLabel.Text = "FILE";
+        dropHint.Visibility = shortcutHint.Visibility = Visibility.Collapsed;
         center.ToolTip = Path.GetFileName(input);
         AutomationProperties.SetName(center, Path.GetFileName(input));
         RenderFormats();
@@ -184,15 +215,25 @@ public partial class MainWindow : Window
     private async Task DiscoverCoreAsync()
     {
         var token = lifetime.Token;
+        discovering = true;
+        UpdatePresentation();
         try
         {
             var capabilities = await Task.Run(() => EngineCapabilities.DetectAsync(preferences, token, input), token);
             if (closing) return;
             catalog = new(capabilities);
-            if (!busy) RenderFormats();
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception ex) { if (!closing) ShowError(ex.Message); }
+        finally
+        {
+            discovering = false;
+            if (!closing)
+            {
+                if (busy) refreshAfterJob = true;
+                else RenderFormats();
+            }
+        }
     }
 
     private void RenderFormats()
@@ -203,8 +244,6 @@ public partial class MainWindow : Window
         if (input is null) return;
         options = catalog.GetOptions(input);
         var ready = options.Where(option => option.Available).ToArray();
-        if (result is null && error is null)
-            hint.Text = ready.Length > 0 ? "Convert to" : discovery is { IsCompleted: false } ? "Checking…" : "More options";
         (double X, double Y)[] slots = [(112, 39), (183, 106), (41, 106)];
         for (var index = 0; index < Math.Min(ready.Length, QuickSlots); index++)
         {
@@ -219,6 +258,7 @@ public partial class MainWindow : Window
             quickButtons.Add(button);
         }
         if (drawerCard.Visibility == Visibility.Visible) RenderExtraFormats();
+        UpdatePresentation();
     }
 
     private void RenderExtraFormats()
@@ -246,7 +286,8 @@ public partial class MainWindow : Window
             };
             extraFormats.Children.Add(button);
         }
-        if (options.Count == 0) extraFormats.Children.Add(Ui.Text("No supported exports for this file.", 11, "Muted"));
+        if (options.Count == 0 && input is not null)
+            extraFormats.Children.Add(Ui.Text(discovering ? "Looking for converters…" : "No supported exports for this file.", 11, "Muted"));
         qualityOptions.Visibility = options.Any(option => option.Available && option.Target.SupportsJpegQuality) ? Visibility.Visible : Visibility.Collapsed;
         dpiOptions.Visibility = options.Any(option => option.Available && option.Target.SupportsDpi) ? Visibility.Visible : Visibility.Collapsed;
         UpdateDetails();
@@ -256,7 +297,6 @@ public partial class MainWindow : Window
     {
         if (busy || closing) return;
         SetDrawer(drawerCard.Visibility != Visibility.Visible);
-        if (drawerCard.Visibility == Visibility.Visible) UpdateDetails();
     }
 
     private void SetDrawer(bool open)
@@ -266,26 +306,29 @@ public partial class MainWindow : Window
         else extraFormats.Children.Clear();
         expandIcon.Kind = open ? "up" : "down";
         AutomationProperties.SetName(expand, open ? "Hide options" : "More formats and options");
-        drawerCard.Measure(new Size(RingSize, double.PositiveInfinity));
-        Height = RingSize + drawerCard.DesiredSize.Height;
-        if (IsLoaded) WindowEffects.PlacePopup(this, anchor, RingSize);
+        FitToContent();
+        if (open && IsLoaded && !preferences.ReducedMotion && !SystemParameters.HighContrast && SystemParameters.ClientAreaAnimation)
+            drawerCard.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120)) { FillBehavior = FillBehavior.Stop });
     }
 
     private void UpdateDetails()
     {
-        details.Text = error ?? (jobSettings.OutputDirectory is null
+        details.Text = jobSettings.OutputDirectory is null
             ? "Save next to the original"
-            : "Save to " + jobSettings.OutputDirectory);
-        details.ToolTip = error ?? jobSettings.OutputDirectory;
+            : "Save to " + jobSettings.OutputDirectory;
+        details.ToolTip = jobSettings.OutputDirectory;
         details.MaxHeight = 44;
         folderButton.ToolTip = jobSettings.OutputDirectory;
+        var canSave = options.Any(option => option.Available);
+        details.Visibility = folderButton.Visibility = canSave ? Visibility.Visible : Visibility.Collapsed;
+        resetFolder.Visibility = canSave && jobSettings.OutputDirectory is not null ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private FrameworkElement AddSlider(string name, int minimum, int maximum, int value, string suffix, Action<int> update)
+    private FrameworkElement AddSlider(string name, int minimum, int maximum, int value, string suffix, Action<int> update, out Slider slider)
     {
         var label = Ui.Text($"{name}  {value}{suffix}", 11, "Muted");
         label.Margin = new Thickness(0, 7, 0, 0);
-        var slider = new Slider { Minimum = minimum, Maximum = maximum, Value = value, TickFrequency = 1, IsSnapToTickEnabled = true, Margin = new Thickness(0, 2, 0, 2) };
+        slider = new Slider { Minimum = minimum, Maximum = maximum, Value = value, TickFrequency = 1, IsSnapToTickEnabled = true, Margin = new Thickness(0, 2, 0, 2) };
         AutomationProperties.SetName(slider, name);
         slider.ValueChanged += (_, e) =>
         {
@@ -305,31 +348,33 @@ public partial class MainWindow : Window
         if (input is null || busy || closing) return;
         error = null;
         result = null;
-        UpdateDetails();
+        using var job = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+        conversion = job;
         busy = true;
         SetControlsEnabled(false);
-        hint.Text = "Working…";
-        AutomationProperties.SetName(center, "Cancel conversion");
+        UpdatePresentation();
         string? saved = null;
         try
         {
             using var service = new ConversionService(catalog.Capabilities);
-            var converted = await service.ConvertAsync(input, target.Extension, settings, lifetime.Token);
+            var converted = await service.ConvertAsync(input, target.Extension, settings, job.Token);
             result = converted.OutputPath;
             saved = result;
-            hint.Text = "Saved";
-            sourceLabel.Text = target.Label;
-            center.ToolTip = converted.OutputPath;
-            AutomationProperties.SetName(center, "Show converted file");
         }
-        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { hint.Text = "Cancelled"; }
+        catch (OperationCanceledException) when (job.IsCancellationRequested) { error = "Conversion cancelled. You can try another format."; }
         catch (Exception ex) { ShowError(ex.Message); }
         finally
         {
             busy = false;
+            conversion = null;
             SetControlsEnabled(true);
-            if (result is null) AutomationProperties.SetName(center, Path.GetFileName(input));
             if (closeAfterCancel) Close();
+            else if (refreshAfterJob)
+            {
+                refreshAfterJob = false;
+                RenderFormats();
+            }
+            else UpdatePresentation();
         }
         if (saved is not null && !closing && drawerCard.Visibility != Visibility.Visible)
         {
@@ -348,10 +393,44 @@ public partial class MainWindow : Window
 
     private void ShowError(string message)
     {
-        hint.Text = "Check options";
         error = message;
-        center.ToolTip = message;
+        UpdatePresentation();
+    }
+
+    private void UpdatePresentation()
+    {
+        var ready = options.Any(option => option.Available);
+        var noExports = input is not null && !ready && !discovering;
+        hint.Text = busy ? "Stop" : result is not null ? "Saved" : input is null ? "Choose file" :
+            discovering && !ready ? "Checking…" : noExports ? (options.Count == 0 ? "Choose file" : "Set up") :
+            error is not null ? "Try again" : "Convert to";
+        center.IsTabStop = busy || result is not null || input is null || noExports;
+        center.ToolTip = busy ? "Cancel conversion (Esc)" : result ?? (input is null ? "Choose a file" : Path.GetFileName(input));
+        var action = busy ? "Cancel conversion" : result is not null ? "Show converted file" :
+            input is null || (noExports && options.Count == 0) ? "Choose a file" :
+            noExports ? "Open converter setup options" : Path.GetFileName(input);
+        AutomationProperties.SetName(center, action);
+
+        var message = error ?? (noExports
+            ? options.Count == 0 ? "There’s no export for this file. Choose another file." : "Open the arrow to set up a converter."
+            : "");
+        if (message.Length > 360) message = message[..357] + "…";
+        status.Text = message;
+        status.ToolTip = message;
+        statusCard.Visibility = message.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         UpdateDetails();
+        FitToContent();
+    }
+
+    private void FitToContent()
+    {
+        var measure = new Size(RingSize, double.PositiveInfinity);
+        statusCard.Measure(measure);
+        drawerCard.Measure(measure);
+        var height = RingSize + statusCard.DesiredSize.Height + drawerCard.DesiredSize.Height;
+        if (Math.Abs(Height - height) < 0.5) return;
+        Height = height;
+        if (IsLoaded) WindowEffects.PlacePopup(this, anchor, RingSize);
     }
 
     private void ChooseFolder()
@@ -364,8 +443,10 @@ public partial class MainWindow : Window
             {
                 jobSettings = jobSettings with { OutputDirectory = dialog.FolderName };
                 UpdateDetails();
+                FitToContent();
             }
         }
+        catch (Exception ex) { ShowError(ex.Message); }
         finally { modal = false; }
     }
 
@@ -377,6 +458,7 @@ public partial class MainWindow : Window
             var dialog = new OpenFileDialog { Title = "Choose a file to convert", CheckFileExists = true };
             if (dialog.ShowDialog(this) == true) OpenFile(dialog.FileName);
         }
+        catch (Exception ex) { ShowError(ex.Message); }
         finally { modal = false; }
     }
 
@@ -389,19 +471,23 @@ public partial class MainWindow : Window
 
     private async Task OpenSettingsAsync(string section = "appearance")
     {
+        if (modal || closing) return;
         modal = true;
         var wasTopmost = Topmost;
         Topmost = false;
         try
         {
-            if (discovery is not null) await discovery;
+            var engines = await Task.Run(() => EngineCapabilities.Locate(preferences));
             if (closing) return;
-            var dialog = new SettingsWindow(preferences, catalog.Capabilities, section) { Owner = this };
+            var dialog = new SettingsWindow(preferences, engines, section) { Owner = this };
             if (dialog.ShowDialog() == true)
             {
+                store.Save(dialog.Settings);
                 preferences = dialog.Settings;
                 jobSettings = preferences;
-                store.Save(preferences);
+                qualitySlider.Value = jobSettings.JpegQuality;
+                dpiSlider.Value = jobSettings.Dpi;
+                if (discovery is not null) await discovery;
                 discovery = null;
                 if (input is not null) await DiscoverAsync();
             }
@@ -430,8 +516,7 @@ public partial class MainWindow : Window
 
     private void CancelJob()
     {
-        closeAfterCancel = true;
-        lifetime.Cancel();
+        conversion?.Cancel();
     }
 
     protected override void OnClosing(CancelEventArgs e)
@@ -439,6 +524,7 @@ public partial class MainWindow : Window
         if (busy)
         {
             e.Cancel = true;
+            closeAfterCancel = true;
             CancelJob();
         }
         else closing = true;
@@ -458,6 +544,16 @@ public partial class MainWindow : Window
         button.Style = (Style)Application.Current.FindResource("RoundButton");
         AutomationProperties.SetName(button, name);
         return button;
+    }
+
+    private TextBlock RingCaption(string text, double centerY)
+    {
+        var label = Ui.Text(text, 10, "Muted", FontWeights.SemiBold);
+        label.Width = 156;
+        label.TextAlignment = TextAlignment.Center;
+        label.IsHitTestVisible = false;
+        Place(label, 112, centerY, 156, 14);
+        return label;
     }
 
     private void Place(FrameworkElement element, double centerX, double centerY, double width, double height)

@@ -11,7 +11,8 @@ if (!$PayloadDirectory) {
     $PayloadDirectory=Join-Path $root "artifacts/win-$Architecture-compact"
 }
 $PayloadDirectory=(Resolve-Path -LiteralPath $PayloadDirectory).Path
-foreach ($required in @('Konvert.exe','Konvert.dll','KonvertHost.exe','Konvert.runtimeconfig.json','Konvert.deps.json','LICENSE')) {
+foreach ($required in @('Konvert.exe','Konvert.dll','KonvertHost.exe','Konvert.runtimeconfig.json','Konvert.deps.json',
+    'LICENSE','NOTICE','PRIVACY.md','THIRD_PARTY_NOTICES.md')) {
     if (!(Test-Path -LiteralPath (Join-Path $PayloadDirectory $required))) { throw "Installer payload missing $required." }
 }
 $runtime = (Get-Content (Join-Path $PayloadDirectory 'Konvert.runtimeconfig.json') -Raw | ConvertFrom-Json).runtimeOptions.frameworks |

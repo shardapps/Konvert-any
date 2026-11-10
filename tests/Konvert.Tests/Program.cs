@@ -37,6 +37,9 @@ internal static class Program
             Equal(224.0, popup.Width); Equal(224.0, popup.Height);
             settingsWindow.Close(); popup.Close(); window.Close();
         });
+        await Test("Picker explains missing and unsupported inputs and opens converter setup", () => PickerTests.VerifyRecovery(Root));
+        await Test("Picker quick and expanded actions save to their respective folders", () => PickerTests.VerifySavePaths(Root));
+        await Test("Picker shows conversion errors and can retry another route", () => PickerTests.VerifyFailedJobCanRetry(Root));
         await Test("Seven persistent themes and high contrast fallback", () =>
         {
             Equal(7, ThemeManager.Themes.Count);

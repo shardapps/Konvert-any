@@ -33,6 +33,8 @@ See upstream [command-line parameters](https://help.libreoffice.org/latest/en-US
 
 Install a trusted FFmpeg build separately, add it to PATH or select `ffmpeg.exe` in Settings. Konvert probes encoders for files with media routes. If the same directory contains FFprobe, it also checks for audio and video streams. The quick circle offers available routes. Open the chevron to see additional formats and links to engine setup.
 
+If the picker has no export for a file, its message tells you whether to choose a different file or open converter setup. If a job fails, the picker shows the cause and lets you retry or choose a different destination. Existing files and incomplete outputs are protected by staged writes.
+
 | Sources | Destinations |
 | --- | --- |
 | MP3, WAV, FLAC, OGG, M4A, AAC, AIFF, WMA, Opus | MP3, WAV, FLAC, OGG, M4A, Opus |

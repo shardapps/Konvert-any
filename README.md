@@ -17,7 +17,7 @@
 
 Konvert is a free, open source **Windows file converter** by **Shardapps**. Select one file in Explorer or on the desktop and press **Ctrl+K**. A 224 DIP circle presents up to three available formats around the source. Pick one to save beside the original at standard quality. Use the bottom chevron to reveal every route, a folder picker, JPEG quality, and image DPI.
 
-**0.3 alpha** brings a smaller radial menu, a shared conversion catalog, and compact **x64 and ARM64 setup EXEs**. The installer uses the shared Microsoft .NET 10 Desktop Runtime.
+**0.3.1 alpha** adds in-place upgrades, a clearer first-run picker, and recovery when a file or converter is unavailable. Compact **x64 and ARM64 setup EXEs** use the shared Microsoft .NET 10 Desktop Runtime.
 
 ## Stay in your flow
 
@@ -53,11 +53,11 @@ Formats are not interchangeable without consequences. Lossy codecs, office layou
 ## Install
 
 1. Pick **x64** for Intel/AMD Windows or **ARM64** for Windows on Arm. Find packages in [Releases](https://github.com/shardapps/Konvert-any/releases) or successful [CI artifacts](https://github.com/shardapps/Konvert-any/actions/workflows/ci.yml).
-2. Install the matching [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) if setup asks for it. Uninstall the previous standalone alpha before installing the compact setup. Konvert installs under **%LOCALAPPDATA%\\Programs\\Shardapps\\Konvert** by default and keeps preferences in a separate directory.
+2. Run Setup in the existing Konvert folder to upgrade. A fresh per-user install defaults to **%LOCALAPPDATA%\\Programs\\Shardapps\\Konvert**. Setup verifies the matching [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) before it changes the installation.
 3. Choose Explorer/PATH integration and startup preferences in setup. Ctrl+K is ready after the listener starts; open a **new terminal** to pick up PATH changes.
 4. Select one file in Explorer and press **Ctrl+K**. For office/media exports, open **Settings → Converters** and configure LibreOffice/FFmpeg.
 
-Windows 11 is the support target. ARM64 packages contain native ARM64 app/runtime/listener binaries, but are cross-built and still need physical-device testing. Windows 11's portable/installer context entry appears under **Show more options**. MSIX is a separate, unsigned Store-preparation artifact. [Install, upgrade and uninstall details](docs/INSTALLATION.md).
+Windows 11 is the support target. The ARM64 setup contains a native ARM64 app and listener. Physical ARM64 testing remains pending. Windows 11 shows the Konvert context entry under **Show more options**. MSIX is a separate, unsigned Store-preparation artifact. [Install, upgrade and uninstall details](docs/INSTALLATION.md).
 
 ## Local, bounded work
 

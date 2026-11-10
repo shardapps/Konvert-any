@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1-alpha.1
+
+- Upgrade registered and orphaned standalone installs in place. Validate the desktop runtime first and remove only exact matches for known legacy files after installing.
+- Preserve converted files and preferences, carry forward owned Windows integration, and use branded light and dark setup visuals.
+- Explain missing files, unsupported formats, converter requirements and failed exports directly in the popup. Allow a failed or cancelled conversion to be retried.
+
 ## 0.3.0-alpha.1
 
 - Use a 224 DIP circle with three quick formats and a chevron for extra formats, folder, quality and DPI. Quick clicks save beside the input with standard settings.

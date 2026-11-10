@@ -1,12 +1,16 @@
 param(
     [Parameter(Mandatory)][string]$IdentityName,
     [Parameter(Mandatory)][string]$Publisher,
-    [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')][string]$Version = '0.3.0.0',
+    [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')][string]$Version,
     [ValidateSet('x64','arm64')][string]$Architecture = 'x64',
     [string]$Dotnet = 'dotnet'
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
+if (!$Version) {
+    $appVersion = ([xml](Get-Content (Join-Path $root 'Directory.Build.props') -Raw)).Project.PropertyGroup.Version
+    $Version = ([version]($appVersion.Split('-')[0])).ToString(3) + '.0'
+}
 $stage = Join-Path $root "artifacts/msix-stage-$Architecture"
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 & $Dotnet publish (Join-Path $root 'src/Konvert') -c Release -r "win-$Architecture" --self-contained true -o $stage -p:DebugType=None -p:DebugSymbols=false

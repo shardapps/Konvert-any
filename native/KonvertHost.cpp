@@ -173,6 +173,27 @@ void OpenSelection() {
         std::to_wstring(selection.anchor.y) + L" " + Quote(selection.path), true);
 }
 
+int StopListener(const std::wstring& expectedPath) {
+    const HWND window = FindWindowExW(HWND_MESSAGE, nullptr, WindowClass, nullptr);
+    if (!window) return 0;
+    DWORD processId{};
+    GetWindowThreadProcessId(window, &processId);
+    HANDLE process = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+    if (!process) return IsWindow(window) ? 2 : 0;
+    std::vector<wchar_t> path(32768);
+    DWORD length = static_cast<DWORD>(path.size());
+    const bool identified = QueryFullProcessImageNameW(process, 0, path.data(), &length) != FALSE;
+    DWORD result = identified ? WAIT_OBJECT_0 : WaitForSingleObject(process, 0);
+    if (identified && _wcsicmp(path.data(), expectedPath.c_str()) == 0) {
+        DWORD currentProcessId{};
+        GetWindowThreadProcessId(window, &currentProcessId);
+        if (currentProcessId == processId) PostMessageW(window, WM_CLOSE, 0, 0);
+        result = WaitForSingleObject(process, 5000);
+    }
+    CloseHandle(process);
+    return result == WAIT_OBJECT_0 ? 0 : 2;
+}
+
 LRESULT CALLBACK WindowProcedure(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     switch (message) {
     case WM_HOTKEY: if (wparam == HotkeyId) OpenSelection(); return 0;
@@ -206,28 +227,17 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     int count{};
     LPWSTR* args = CommandLineToArgvW(GetCommandLineW(), &count);
-    const bool exitRequested = count > 1 && wcscmp(args[1], L"--exit") == 0;
+    if (!args) return 1;
+    const bool stopAt = count > 1 && wcscmp(args[1], L"--stop-at") == 0;
+    const std::filesystem::path stopTarget = stopAt && count == 3 ? args[2] : L"";
+    const bool exitRequested = count == 2 && wcscmp(args[1], L"--exit") == 0;
     const bool selfTest = count > 1 && wcscmp(args[1], L"--self-test") == 0;
     LocalFree(args);
     if (selfTest) return Quote(L"a b\\") == L"\"a b\\\\\"" && Quote(L"x\"y") == L"\"x\\\"y\"" ? 0 : 1;
-    if (exitRequested) {
-        if (HWND window = FindWindowExW(HWND_MESSAGE, nullptr, WindowClass, nullptr)) {
-            DWORD processId{}; GetWindowThreadProcessId(window, &processId);
-            HANDLE process = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
-            if (!process) return 2;
-            std::vector<wchar_t> path(32768);
-            DWORD length = static_cast<DWORD>(path.size());
-            const bool owned = QueryFullProcessImageNameW(process, 0, path.data(), &length) &&
-                _wcsicmp(path.data(), OwnPath().c_str()) == 0;
-            DWORD result = WAIT_OBJECT_0;
-            if (owned) {
-                PostMessageW(window, WM_CLOSE, 0, 0);
-                result = WaitForSingleObject(process, 5000);
-            }
-            CloseHandle(process);
-            if (result != WAIT_OBJECT_0) return 2;
-        }
-        return 0;
+    if (exitRequested) return StopListener(OwnPath());
+    if (stopAt) {
+        if (!stopTarget.is_absolute() || _wcsicmp(stopTarget.filename().c_str(), L"KonvertHost.exe") != 0) return 1;
+        return StopListener(stopTarget.lexically_normal().wstring());
     }
     HANDLE mutex = CreateMutexW(nullptr, TRUE, L"Local\\Shardapps.Konvert.HotkeyHost");
     if (!mutex || GetLastError() == ERROR_ALREADY_EXISTS) { if (mutex) CloseHandle(mutex); return 0; }

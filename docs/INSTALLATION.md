@@ -1,6 +1,6 @@
 # Installation and removal
 
-Konvert targets Windows 11. Choose x64 for Intel/AMD or ARM64 for Windows on Arm. The compact setup checks for the matching [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) and offers to open Microsoft's download page if needed. Physical ARM64 testing remains pending. GitHub previews are unsigned.
+Konvert targets Windows 11. Choose x64 for Intel/AMD or ARM64 for Windows on Arm. Setup runs a temporary copy of the app to verify the matching [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0). If the runtime cannot start, Setup offers Microsoft's download page before modifying an existing installation. Physical ARM64 testing remains pending. GitHub previews are unsigned.
 
 ## Setup EXE
 
@@ -10,7 +10,9 @@ With Explorer integration or sign-in startup enabled, setup starts the native li
 
 Windows 11 shows the installer/portable Explorer command under **Show more options**. A modern packaged Explorer extension remains future work. Open a new terminal after PATH changes. The installer prepends its own directory, preserving unrelated PATH entries and removing only a previous entry Konvert recorded owning.
 
-Uninstall 0.2 before moving from the standalone setup to the compact setup. The uninstall keeps your Konvert preferences and converted files. To repair or update a compact installation, close visible Konvert windows and run the matching setup again.
+Close any visible Konvert windows and run the new setup to upgrade or repair. Use the existing Konvert destination. Setup recognizes the standalone 0.2 and compact 0.3 layouts, including copies without an Installed apps entry. It installs the compact app inside `Konvert.App` within that folder and moves the selected Explorer, PATH and startup entries to it. Shortcuts you created yourself can point to `Konvert.App\Konvert.exe`.
+
+After installation, Setup removes exact matches for files shipped with the previous alpha builds. Locally modified files, other documents, and settings in `%LOCALAPPDATA%\Shardapps\Konvert` are preserved. Files from custom builds with different hashes may remain in the old folder. Setup asks for a different location if an unrelated folder is selected.
 
 ## Optional engines
 

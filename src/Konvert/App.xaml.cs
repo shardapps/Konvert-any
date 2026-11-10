@@ -11,6 +11,11 @@ public partial class App : Application
         // This small, mostly static picker does not need a dedicated GPU rendering pipeline.
         System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
         base.OnStartup(e);
+        if (e.Args is ["--setup-check"])
+        {
+            Shutdown(0);
+            return;
+        }
         if (e.Args.FirstOrDefault() is "--install-integration" or "--remove-integration")
         {
             try
