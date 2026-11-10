@@ -17,7 +17,7 @@ Same-extension targets are removed. JPG/JPEG and TIF/TIFF aliases may result in 
 
 ## Optional LibreOffice
 
-Install LibreOffice separately and restart Konvert, or select `soffice.exe` in Settings. Konvert searches Program Files and absolute PATH directories, not the current folder. The engine is not downloaded or bundled by the app.
+Install LibreOffice locally and restart Konvert, or select `soffice.com` or `soffice.exe` in **Settings → Converters**. Konvert prefers the console launcher when available and searches Program Files and absolute PATH directories. The engine is installed separately.
 
 | Source family | Destinations |
 | --- | --- |
@@ -25,7 +25,7 @@ Install LibreOffice separately and restart Konvert, or select `soffice.exe` in S
 | XLSX, XLS, ODS, CSV, TSV | PDF, XLSX, ODS, CSV |
 | PPTX, PPT, ODP | PDF, PPTX, ODP |
 
-Native routes take priority where both engines offer a target. LibreOffice uses its extension-selected default export filters and a fresh isolated profile with macro security set to level 3. It has a three-minute timeout. Office fonts, complex layout, fields, formulas, links and animations may differ. Spreadsheet-to-CSV is a single-sheet export and loses formatting/formulas. CSV/TSV imports use LibreOffice defaults, which may infer types or delimiters; use native table routes when preserving string values matters. Password-protected files are not supported. External linked resources are not a security sandbox boundary.
+Native routes take priority where both engines offer a target. LibreOffice uses its extension-selected default export filters and a fresh isolated profile with macro security set to level 3. The 60-second deadline includes engine startup and diagnostic output. Office fonts, complex layout, fields, formulas, links and animations may differ. Spreadsheet-to-CSV is a single-sheet export and loses formatting and formulas. CSV/TSV imports use LibreOffice defaults, which may infer types or delimiters. Use native table routes when preserving string values matters. Password-protected files are unsupported. [LibreOffice command-line options](https://help.libreoffice.org/latest/en-US/text/shared/guide/start_parameters.html?System=WIN).
 
 See upstream [command-line parameters](https://help.libreoffice.org/latest/en-US/text/shared/guide/start_parameters.html).
 

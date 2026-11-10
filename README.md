@@ -15,9 +15,9 @@
 
 </div>
 
-Konvert is a free, open source **Windows file converter** by **Shardapps**. Select one file in Explorer or on the desktop and press **Ctrl+K**. A 224 DIP circle presents up to three available formats around the source. Pick one to save beside the original at standard quality. Use the bottom chevron to reveal every route, a folder picker, JPEG quality, and image DPI.
+Konvert is a free, open source **Windows file converter** by **Shardapps**. Select one file in Explorer or on the desktop and press **Ctrl+K**. A 224 DIP circle opens below the selection when there’s room, with up to three labelled formats. Pick one to save beside the original at standard quality. Open **Options** for the full format list, a folder picker, JPEG quality, and image DPI.
 
-**0.3.1 alpha** adds in-place upgrades, a clearer first-run picker, and recovery when a file or converter is unavailable. Compact **x64 and ARM64 setup EXEs** use the shared Microsoft .NET 10 Desktop Runtime.
+**0.3.2 alpha** refreshes Glass, places the popup near the selected file, and shows the destination format and engine during conversion. Click outside to dismiss it. An active export keeps running in the background. Compact **x64 and ARM64 setup EXEs** use the shared Microsoft .NET 10 Desktop Runtime.
 
 ## Stay in your flow
 
@@ -25,7 +25,7 @@ Konvert is a free, open source **Windows file converter** by **Shardapps**. Sele
 | --- | --- | --- |
 | Choose one filesystem file in Explorer or on the desktop. | Press **Ctrl+K**, use the Explorer **Konvert** command, or pass a file path. | Choose a format. Existing files and the original stay untouched. |
 
-The small native listener registers Ctrl+K **only while Explorer or the desktop is active**, so browsers and editors keep their own shortcut. It uses Windows foreground events and queries selection only when invoked. No keyboard recording, clipboard capture, selection polling or Windows service. Closing the popup releases the managed conversion UI; pause or quit the listener from its tray menu.
+The small native listener registers Ctrl+K **only while Explorer or the desktop is active**, so browsers and editors keep their own shortcut. It uses Windows foreground events and queries selection only when invoked. The managed UI exits after the popup closes and any background export finishes. Pause or quit the listener from its tray menu.
 
 ## A quieter surface
 

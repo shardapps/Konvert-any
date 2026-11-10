@@ -5,6 +5,8 @@
 #include <exdisp.h>
 #include <shobjidl.h>
 #include <wrl/client.h>
+#include <algorithm>
+#include <array>
 #include <string>
 #include <vector>
 #include <fstream>
@@ -15,15 +17,18 @@ namespace {
 constexpr wchar_t WindowClass[] = L"Shardapps.Konvert.HotkeyHost";
 constexpr UINT TrayMessage = WM_APP + 1;
 constexpr UINT ForegroundChanged = WM_APP + 2;
+constexpr UINT PopupDismissed = WM_APP + 3;
+constexpr UINT BackgroundResult = WM_APP + 4;
 constexpr int HotkeyId = 41;
 HWND hostWindow{};
 HWINEVENTHOOK foregroundHook{};
 bool registered{};
 bool paused{};
-HANDLE popupProcess{};
+struct PopupProcess { HANDLE process{}; DWORD id{}; bool dismissed{}; };
+std::array<PopupProcess, 2> popups{};
 NOTIFYICONDATAW tray{sizeof(NOTIFYICONDATAW)};
 
-struct Selection { std::wstring path; POINT anchor{}; HWND owner{}; };
+struct Selection { std::wstring path; POINT anchor{}; LONG itemTop{}; };
 
 std::wstring Quote(const std::wstring& value) {
     std::wstring result = L"\"";
@@ -53,7 +58,7 @@ bool IsExplorer(HWND window) {
         wcscmp(name, L"Progman") == 0 || wcscmp(name, L"WorkerW") == 0;
 }
 
-bool ReadView(IShellBrowser* browser, HWND foreground, Selection& selection) {
+bool ReadView(IShellBrowser* browser, Selection& selection) {
     ComPtr<IShellView> view;
     if (FAILED(browser->QueryActiveShellView(&view))) return false;
     HWND viewWindow{};
@@ -73,17 +78,31 @@ bool ReadView(IShellBrowser* browser, HWND foreground, Selection& selection) {
     if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &path))) return false;
     selection.path = path;
     CoTaskMemFree(path);
-    selection.owner = foreground;
     GetCursorPos(&selection.anchor);
+    selection.itemTop = selection.anchor.y;
     int index{};
     PITEMID_CHILD pidl{};
     POINT position{};
     if (SUCCEEDED(folder->GetSelectedItem(-1, &index)) && SUCCEEDED(folder->Item(index, &pidl))) {
-        if (SUCCEEDED(folder->GetItemPosition(pidl, &position))) {
-            // Item coordinates identify the selected item, even when the pointer is elsewhere.
-            position.x += 24; position.y += 20;
-            ClientToScreen(viewWindow, &position);
-            selection.anchor = position;
+        RECT viewBounds{};
+        if (SUCCEEDED(folder->GetItemPosition(pidl, &position)) && GetClientRect(viewWindow, &viewBounds)) {
+            const auto reportedDpi = GetDpiForWindow(viewWindow);
+            const int dpi = reportedDpi ? static_cast<int>(reportedDpi) : 96;
+            POINT spacing{MulDiv(64, dpi, 96), MulDiv(28, dpi, 96)};
+            POINT measured{};
+            if (SUCCEEDED(folder->GetSpacing(&measured)) && measured.x > 0 && measured.y > 0)
+                spacing = measured;
+            if (position.y < viewBounds.bottom && position.y + spacing.y > viewBounds.top) {
+                // In Details view the reported width can span the row. Keep the anchor near its filename.
+                const LONG width = std::clamp(spacing.x, 1L, static_cast<LONG>(MulDiv(160, dpi, 96)));
+                POINT top{position.x, std::clamp(position.y, viewBounds.top, viewBounds.bottom)};
+                POINT bottom{std::clamp(position.x + width / 2, viewBounds.left, viewBounds.right),
+                    std::clamp(position.y + spacing.y, viewBounds.top, viewBounds.bottom)};
+                if (ClientToScreen(viewWindow, &top) && ClientToScreen(viewWindow, &bottom)) {
+                    selection.anchor = bottom;
+                    selection.itemTop = top.y;
+                }
+            }
         }
         CoTaskMemFree(pidl);
     }
@@ -109,7 +128,7 @@ bool SelectedFile(Selection& selection) {
         ComPtr<IServiceProvider> provider;
         ComPtr<IShellBrowser> browser;
         if (SUCCEEDED(dispatch.As(&provider)) && SUCCEEDED(provider->QueryService(SID_STopLevelBrowser, IID_PPV_ARGS(&browser))) &&
-            ReadView(browser.Get(), foreground, selection)) return true;
+            ReadView(browser.Get(), selection)) return true;
     }
     // Never substitute an unrelated desktop selection for an empty Explorer selection.
     wchar_t foregroundClass[128]{};
@@ -125,7 +144,7 @@ bool SelectedFile(Selection& selection) {
         ComPtr<IServiceProvider> provider;
         ComPtr<IShellBrowser> browser;
         if (SUCCEEDED(desktop.As(&provider)) && SUCCEEDED(provider->QueryService(SID_STopLevelBrowser, IID_PPV_ARGS(&browser))))
-            return ReadView(browser.Get(), foreground, selection);
+            return ReadView(browser.Get(), selection);
     }
     return false;
 }
@@ -151,26 +170,36 @@ void CALLBACK ForegroundEvent(HWINEVENTHOOK, DWORD, HWND, LONG, LONG, DWORD, DWO
     PostMessageW(hostWindow, ForegroundChanged, 0, 0);
 }
 
-void Launch(const std::wstring& arguments, bool trackPopup = false) {
+void Launch(const std::wstring& arguments, PopupProcess* popup = nullptr) {
     const auto executable = (std::filesystem::path(OwnPath()).parent_path() / L"Konvert.exe").wstring();
     std::wstring command = Quote(executable) + L" " + arguments;
     STARTUPINFOW startup{sizeof(startup)};
     PROCESS_INFORMATION process{};
     if (CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &process)) {
         CloseHandle(process.hThread);
-        if (trackPopup) {
-            if (popupProcess) CloseHandle(popupProcess);
-            popupProcess = process.hProcess;
+        if (popup) {
+            *popup = {process.hProcess, process.dwProcessId, false};
+            AllowSetForegroundWindow(process.dwProcessId);
         } else CloseHandle(process.hProcess);
     } else Notify(L"Konvert.exe could not be opened. Repair or reinstall Konvert.");
 }
 
 void OpenSelection() {
-    if (popupProcess && WaitForSingleObject(popupProcess, 0) == WAIT_TIMEOUT) return;
+    PopupProcess* available{};
+    for (auto& popup : popups) {
+        if (popup.process && WaitForSingleObject(popup.process, 0) != WAIT_TIMEOUT) {
+            CloseHandle(popup.process);
+            popup = {};
+        }
+        if (popup.process && !popup.dismissed) return;
+        if (!popup.process) available = &popup;
+    }
+    if (!available) { Notify(L"Two conversions are running. Try again when one finishes."); return; }
     Selection selection;
     if (!SelectedFile(selection)) { Notify(L"Select one local file in Explorer or on the desktop, then press Ctrl+K."); return; }
-    Launch(L"--popup --anchor-x " + std::to_wstring(selection.anchor.x) + L" --anchor-y " +
-        std::to_wstring(selection.anchor.y) + L" " + Quote(selection.path), true);
+    Launch(L"--popup --shortcut --anchor-x " + std::to_wstring(selection.anchor.x) + L" --anchor-y " +
+        std::to_wstring(selection.anchor.y) + L" --anchor-top " + std::to_wstring(selection.itemTop) +
+        L" " + Quote(selection.path), available);
 }
 
 int StopListener(const std::wstring& expectedPath) {
@@ -198,6 +227,13 @@ LRESULT CALLBACK WindowProcedure(HWND window, UINT message, WPARAM wparam, LPARA
     switch (message) {
     case WM_HOTKEY: if (wparam == HotkeyId) OpenSelection(); return 0;
     case ForegroundChanged: UpdateHotkey(); return 0;
+    case PopupDismissed:
+        for (auto& popup : popups) if (popup.id == wparam) popup.dismissed = true;
+        return 0;
+    case BackgroundResult:
+        if (wparam == 1) Notify(L"Conversion finished. The file was saved to the selected folder.");
+        if (wparam == 2) Notify(L"Conversion did not finish. Retry with the popup open to see the error.");
+        return 0;
     case TrayMessage:
         if (lparam == WM_LBUTTONUP) Launch(L"");
         if (lparam == WM_RBUTTONUP) {
@@ -257,7 +293,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     if (registered) UnregisterHotKey(hostWindow, HotkeyId);
     if (foregroundHook) UnhookWinEvent(foregroundHook);
     Shell_NotifyIconW(NIM_DELETE, &tray);
-    if (popupProcess) CloseHandle(popupProcess);
+    for (auto& popup : popups) if (popup.process) CloseHandle(popup.process);
     CoUninitialize(); CloseHandle(mutex);
     return 0;
 }

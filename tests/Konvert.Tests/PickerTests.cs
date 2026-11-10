@@ -90,6 +90,33 @@ internal static class PickerTests
         }
     }
 
+    public static void VerifyBackgroundSave(string directory)
+    {
+        var previousContext = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
+        var input = Path.Combine(directory, "picker-background.log");
+        File.WriteAllText(input, new string('x', 1024 * 1024));
+        var picker = new MainWindow(input, preferences: new());
+        var closed = false;
+        picker.Closed += (_, _) => closed = true;
+        try
+        {
+            Require(!picker.ShowInTaskbar, "A file picker must stay a transient popup.");
+            Click(FindButton(picker, "Convert to TXT"));
+            Require(HasButton(picker, "Cancel conversion"), "The test conversion should be running.");
+            picker.DismissPopup();
+            Require(!closed, "Dismissing the popup must let its job finish.");
+            AwaitState(() => closed);
+            Require(new FileInfo(Path.ChangeExtension(input, "txt")).Length == 1024 * 1024,
+                "The dismissed conversion must still save the full output.");
+        }
+        finally
+        {
+            if (!closed) picker.Close();
+            SynchronizationContext.SetSynchronizationContext(previousContext);
+        }
+    }
+
     private static void AwaitState(Func<bool> ready)
     {
         var frame = new DispatcherFrame();

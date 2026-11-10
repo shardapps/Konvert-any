@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2-alpha.1
+
+- Anchor the Ctrl+K popup beneath the selected item when space permits. Clicking away dismisses the popup during any state and lets an active export finish.
+- Refresh Glass with a graphite shell, icy cyan focus, readable tooltips, labelled format buttons, and an Options capsule. Show the destination format, engine, and elapsed time while converting.
+- Prefer LibreOffice’s console launcher for office exports. Bound launch and output handling to 60 seconds, stop the converter process tree on timeout, and show recovery guidance.
+
 ## 0.3.1-alpha.1
 
 - Upgrade registered and orphaned standalone installs in place. Validate the desktop runtime first and remove only exact matches for known legacy files after installing.

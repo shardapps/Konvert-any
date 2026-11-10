@@ -84,12 +84,28 @@ public sealed class ConversionService(EngineCapabilities capabilities) : IDispos
             Directory.CreateDirectory(Path.Combine(profile, "user"));
             File.WriteAllText(Path.Combine(profile, "user", "registrymodifications.xcu"),
                 "<?xml version=\"1.0\"?><oor:items xmlns:oor=\"http://openoffice.org/2001/registry\"><item oor:path=\"/org.openoffice.Office.Common/Security/Scripting\"><prop oor:name=\"MacroSecurityLevel\" oor:op=\"fuse\"><value>3</value></prop></item></oor:items>");
-            await ExternalProcess.RunAsync(capabilities.LibreOffice!,
-                [$"-env:UserInstallation={new Uri(profile + Path.DirectorySeparatorChar).AbsoluteUri}", "--headless", "--nologo", "--nodefault", "--norestore", "--convert-to", extension, "--outdir", workspace, input],
-                TimeSpan.FromMinutes(3), token);
+            ExternalProcess.Output diagnostics;
+            try
+            {
+                diagnostics = await ExternalProcess.RunAsync(capabilities.LibreOffice!,
+                    [$"-env:UserInstallation={new Uri(profile + Path.DirectorySeparatorChar).AbsoluteUri}", "--headless", "--nologo", "--nodefault", "--norestore", "--convert-to", extension, "--outdir", workspace, input],
+                    TimeSpan.FromSeconds(60), token, workingDirectory: workspace);
+            }
+            catch (TimeoutException ex)
+            {
+                throw new TimeoutException("LibreOffice did not finish within one minute. Check the executable in Preferences → Converters. Use a local LibreOffice installation for files on a streamed drive.", ex);
+            }
             var result = Path.Combine(workspace, Path.ChangeExtension(Path.GetFileName(input), extension));
-            if (!File.Exists(result)) throw new IOException("LibreOffice could not export this file. It may be corrupt, encrypted, or unsupported.");
-            File.Copy(result, output, false);
+            if (!File.Exists(result))
+            {
+                var error = diagnostics.StandardError.Trim();
+                throw new IOException(string.IsNullOrEmpty(error)
+                    ? "LibreOffice could not export this file. Check whether it is password protected or damaged."
+                    : $"LibreOffice could not export this file. {error}");
+            }
+            await using var source = new FileStream(result, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
+            await using var destination = new FileStream(output, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true);
+            await source.CopyToAsync(destination, token);
         }
         finally
         {

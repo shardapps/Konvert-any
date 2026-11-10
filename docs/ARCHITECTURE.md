@@ -19,11 +19,11 @@ flowchart LR
 
 KonvertHost.exe is C++20/Win32, statically linked with the C runtime. It registers Ctrl+K only for Explorer/desktop foreground windows. SetWinEventHook delivers foreground events without polling; RegisterHotKey receives the shortcut without a low-level keyboard recorder. Windows Shell COM provides one selected filesystem item and its view position. Empty Explorer selections never fall back to unrelated desktop selections.
 
-The listener sleeps in GetMessage when idle. It exposes tray open/settings/pause/quit controls, uses a named mutex to avoid duplicates, bounds concurrent popup launching, and waits for process exit when asked to stop during setup. It records no clipboard contents, keyboard stream or selection history.
+The listener sleeps in GetMessage when idle. It exposes tray open/settings/pause/quit controls, uses a named mutex to avoid duplicates, and waits for process exit when asked to stop during setup. It tracks at most two shortcut processes, with one visible picker at a time. It records no clipboard contents, keyboard stream or selection history.
 
 ## UI and themes
 
-The managed application is .NET 10/WPF with software rendering. A file argument opens a 224 DIP popup. With no file it shows a compact picker. Placement respects monitor scale and work area. The chevron opens an options panel below the same circle. The managed process exits when its windows close.
+The managed application is .NET 10/WPF with software rendering. A file argument opens a 224 DIP popup. With no file it shows a compact picker. The shortcut anchors the circle to the selected item and keeps it inside the monitor work area. A temporary click watcher dismisses the visible file popup. An active export continues while hidden, then the UI process exits.
 
 The conversion catalog maps each supported source and destination to a provider. Route availability and execution use the same definitions, including required media encoders. Conversion work leaves the UI thread before opening files. Image decoding uses an STA worker, CSV/TSV parsing streams through a reader, and external processes run asynchronously with bounded diagnostics.
 
@@ -31,7 +31,7 @@ ThemeManager supplies seven color systems and system high contrast fallback. App
 
 ## Conversion safety
 
-FormatRegistry distinguishes supported routes from routes requiring engine setup. ConversionService executes only available routes. A semaphore bounds one heavy job per managed process. Native work uses a short-lived STA worker; engines use argument lists, concurrent bounded diagnostic draining, deadlines and process-tree cancellation.
+FormatRegistry distinguishes supported routes from routes requiring engine setup. ConversionService executes only available routes. A semaphore bounds one heavy job per managed process. Native work uses a short-lived STA worker. External engines use argument lists, a wall-clock deadline covering launch and bounded diagnostic draining, and Windows job objects for process-tree cleanup.
 
 Output is staged beside the destination, then moved without overwrite with numbered collision suffixes. The original is never written. Office exports use an isolated profile with macro security at its highest level. Text streams in bounded chunks; CSV/TSV rows are yielded; image dimensions and table input have explicit limits. [Format fidelity](FORMATS.md).
 
