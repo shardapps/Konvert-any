@@ -53,6 +53,7 @@ internal static class Program
             settingsWindow.Close(); popup.Close(); window.Close();
         });
         await Test("Picker explains missing and unsupported inputs and opens converter setup", () => PickerTests.VerifyRecovery(Root));
+        await Test("Click-away dismisses the first-launch picker", PickerTests.VerifyHomeDismissal);
         await Test("Picker quick and expanded actions save to their respective folders", () => PickerTests.VerifySavePaths(Root));
         await Test("Picker shows conversion errors and can retry another route", () => PickerTests.VerifyFailedJobCanRetry(Root));
         await Test("Dismissing a busy popup hides it and preserves the conversion", () => PickerTests.VerifyBackgroundSave(Root));
@@ -79,6 +80,10 @@ internal static class Program
             var contrast = new System.Windows.ResourceDictionary();
             ThemeManager.Apply("glass", contrast, true);
             Equal(System.Windows.SystemColors.WindowBrush, contrast["Surface"]);
+            Equal(System.Windows.SystemColors.WindowBrush, contrast["LensFill"]);
+            ThemeManager.Apply("glass", contrast, false, reducedTransparency: true);
+            Equal((byte)255, ((SolidColorBrush)contrast["LensFill"]).Color.A);
+            True(((RadialGradientBrush)contrast["LensLight"]).GradientStops.All(stop => stop.Color.A == 0));
             Equal("glass", (new ConversionSettings { Theme = "invalid" }).Validate().Theme);
 
             static double Luminance(Color color) => 0.2126 * color.ScR + 0.7152 * color.ScG + 0.0722 * color.ScB;
@@ -133,6 +138,27 @@ internal static class Program
             True(registry.Resolve("clip.avi", "mp3") is null);
             True(registry.Resolve("photo.JPEG", "jpg") is null);
             Equal("jpg", registry.Resolve("photo.png", ".JPEG")!.Extension);
+        });
+        await Test("Video requires the installed container and only encoders for present tracks", () =>
+        {
+            var videoOnly = new EngineCapabilities(null, "ffmpeg.exe", new HashSet<string> { "libx264" })
+            {
+                HasVideo = true,
+                HasAudio = false,
+                Muxers = new HashSet<string> { "mov" }
+            };
+            True(new FormatRegistry(videoOnly).GetTargets("video.mp4").Any(target => target.Extension == "mov"));
+            True(new FormatRegistry(videoOnly).GetTargets("video.mp4").All(target => target.Extension != "mkv"));
+            True(new FormatRegistry(videoOnly with { HasAudio = true }).GetTargets("video.mp4").All(target => target.Extension != "mov"));
+        });
+        await TestAsync("Unreadable modern image offers codec guidance without a false-ready export", async () =>
+        {
+            var input = Put("broken.heic", "not an image");
+            var capabilities = await EngineCapabilities.DetectAsync(new(), source: input);
+            var options = new FormatRegistry(capabilities).GetOptions(input);
+            True(options.Any(option => option.Target.Extension == "jpg" && !option.Available &&
+                option.UnavailableReason!.Contains("Windows could not read")));
+            True(options.All(option => !option.Available));
         });
         await Test("CSV parser handles multiline, quotes, trailing fields", () =>
         {
@@ -220,13 +246,40 @@ internal static class Program
                 writer.Write("<!DOCTYPE x [<!ENTITY leak SYSTEM 'file:///C:/Windows/win.ini'>]><x>&leak;</x>");
             await ThrowsAsync<System.Xml.XmlException>(() => service.ConvertAsync(path, "txt", new()));
         });
+        await TestAsync("ODT extracts displayed paragraphs, tabs and spacing without LibreOffice", async () =>
+        {
+            var path = Path.Combine(Root, "native.odt");
+            using (var archive = ZipFile.Open(path, ZipArchiveMode.Create))
+            using (var writer = new StreamWriter(archive.CreateEntry("content.xml").Open()))
+                writer.Write("""
+                    <office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                      xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+                      <office:body><office:text>
+                        <text:tracked-changes><text:p>deleted</text:p></text:tracked-changes>
+                        <text:h>Résumé</text:h>
+                        <text:p>Alpha<text:s text:c="2"/><text:span>β</text:span><text:tab/>One<office:annotation><text:p>comment</text:p></office:annotation><text:line-break/>Two</text:p>
+                      </office:text></office:body>
+                    </office:document-content>
+                    """);
+            var output = await service.ConvertAsync(path, "txt", new());
+            Equal($"Résumé{Environment.NewLine}Alpha  β\tOne{Environment.NewLine}Two{Environment.NewLine}", File.ReadAllText(output.OutputPath));
+        });
+        await TestAsync("Flat JSON exports a quoted TSV with the same scalar values", async () =>
+        {
+            var source = Put("tsv-export.json", """[{"name":"two\tparts","count":2},{"name":"one","count":null}]""");
+            var output = await service.ConvertAsync(source, "tsv", new());
+            var rows = TableConverter.Parse(File.ReadAllText(output.OutputPath), '\t').ToArray();
+            Equal("two\tparts", rows[1][0]); Equal("2", rows[1][1]); Equal("", rows[2][1]);
+        });
         await Test("Corrupt settings recover and values are bounded", () =>
         {
             var directory = Path.Combine(Root, "settings"); Directory.CreateDirectory(directory);
             File.WriteAllText(Path.Combine(directory, "settings.json"), "{oops");
             var store = new SettingsStore(directory); Equal(90, store.Load().JpegQuality);
-            store.Save(new() { JpegQuality = 999, Dpi = -1, ReducedMotion = true });
-            Equal(100, store.Load().JpegQuality); Equal(72, store.Load().Dpi); True(store.Load().ReducedMotion);
+            store.Save(new() { JpegQuality = 999, Dpi = -1, MaxImageEdge = 4096, ReducedMotion = true, ReducedTransparency = true });
+            var saved = store.Load();
+            Equal(100, saved.JpegQuality); Equal(72, saved.Dpi); Equal(3840, saved.MaxImageEdge);
+            True(saved.ReducedMotion && saved.ReducedTransparency);
         });
         var image = MakeImage();
         foreach (var extension in new[] { "jpg", "bmp", "tiff", "gif", "pdf" })
@@ -246,6 +299,36 @@ internal static class Program
                     if (extension != "gif") True(Math.Abs(decoder.Frames[0].DpiX - 144) < 1);
                 }
             });
+        await TestAsync("ICO exports six alpha-aware sizes and reopens at the largest frame", async () =>
+        {
+            var icon = await service.ConvertAsync(image, "ico", new());
+            using (var file = File.OpenRead(icon.OutputPath))
+            {
+                var decoder = new IconBitmapDecoder(file, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+                Equal("16,32,48,64,128,256", string.Join(',', decoder.Frames.Select(frame => frame.PixelWidth).Order()));
+                var largest = decoder.Frames.MaxBy(frame => frame.PixelWidth)!;
+                var pixels = new FormatConvertedBitmap(largest, PixelFormats.Bgra32, null, 0);
+                var corner = new byte[4];
+                pixels.CopyPixels(new System.Windows.Int32Rect(0, 0, 1, 1), corner, 4, 0);
+                Equal((byte)0, corner[3]);
+            }
+            var png = await service.ConvertAsync(icon.OutputPath, "png", new());
+            using var stream = File.OpenRead(png.OutputPath);
+            var reopened = new PngBitmapDecoder(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+            Equal(256, reopened.Frames[0].PixelWidth);
+        });
+        var largeImage = MakeImage("wide.png", 180, 90);
+        await TestAsync("Image size shrinks the longest edge and keeps DPI and proportions", async () =>
+        {
+            var result = await service.ConvertAsync(largeImage, "jpg", new() { MaxImageEdge = 64, Dpi = 200 });
+            using var file = File.OpenRead(result.OutputPath);
+            var frame = new JpegBitmapDecoder(file, BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
+            Equal(64, frame.PixelWidth); Equal(32, frame.PixelHeight); True(Math.Abs(frame.DpiX - 200) < 1);
+            var noUpscale = await service.ConvertAsync(image, "jpg", new() { MaxImageEdge = 512 });
+            using var smaller = File.OpenRead(noUpscale.OutputPath);
+            var unchanged = new JpegBitmapDecoder(smaller, BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
+            Equal(32, unchanged.PixelWidth); Equal(24, unchanged.PixelHeight);
+        });
         await TestAsync("Invalid image fails without partial output", async () =>
         {
             await ThrowsAsync<Exception>(() => service.ConvertAsync(Put("invalid.png", "not an image"), "jpg", new()));
@@ -292,21 +375,48 @@ internal static class Program
         else
         {
             using var media = new ConversionService(capabilities);
+            var registry = new FormatRegistry(capabilities);
             var wav = Path.Combine(Root, "tone.wav");
             await ExternalProcess.RunAsync(capabilities.Ffmpeg, ["-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=0.2", wav], TimeSpan.FromSeconds(20), CancellationToken.None);
-            foreach (var target in new FormatRegistry(capabilities).GetTargets(wav).Where(t => t.Engine == "FFmpeg"))
+            if (args.Contains("--require-ffmpeg"))
+                await Test("Required FFmpeg audio containers are detected", () =>
+                    True(new[] { "aac", "aiff", "caf", "mp3", "flac", "ogg", "m4a", "opus" }.All(ext => registry.Resolve(wav, ext) is not null)));
+            foreach (var target in registry.GetTargets(wav).Where(t => t.Engine == "FFmpeg"))
                 await TestAsync($"FFmpeg WAV → {target.Extension} decodes correctly", async () =>
                 {
                     var result = await media.ConvertAsync(wav, target.Extension, new());
                     await ExternalProcess.RunAsync(capabilities.Ffmpeg, ["-v", "error", "-i", result.OutputPath, "-f", "null", "-"], TimeSpan.FromSeconds(20), CancellationToken.None);
                 });
-            var video = Path.Combine(Root, "clip.avi");
-            await ExternalProcess.RunAsync(capabilities.Ffmpeg, ["-v", "error", "-f", "lavfi", "-i", "color=c=cyan:s=64x64:d=0.2", "-c:v", "mpeg4", video], TimeSpan.FromSeconds(20), CancellationToken.None);
-            foreach (var target in new FormatRegistry(capabilities).GetTargets(video).Where(t => t.Engine == "FFmpeg" && new[] { "mp4", "mkv", "webm", "gif" }.Contains(t.Extension)))
+            var video = Path.Combine(Root, "clip.m4v");
+            await ExternalProcess.RunAsync(capabilities.Ffmpeg,
+                ["-v", "error", "-f", "lavfi", "-i", "color=c=cyan:s=64x64:d=0.4", "-i", wav, "-c:v", "mpeg4", "-c:a", "aac", "-f", "mp4", video],
+                TimeSpan.FromSeconds(20), CancellationToken.None);
+            string[] videoTargets = ["mp4", "mkv", "webm", "gif", "mov", "avi", "ts"];
+            if (args.Contains("--require-ffmpeg"))
+                await Test("Required FFmpeg video containers are detected", () => True(videoTargets.All(ext => registry.Resolve(video, ext) is not null)));
+            foreach (var target in registry.GetTargets(video).Where(t => t.Engine == "FFmpeg" && videoTargets.Contains(t.Extension)))
                 await TestAsync($"FFmpeg video → {target.Extension} decodes correctly", async () =>
                 {
                     var result = await media.ConvertAsync(video, target.Extension, new());
                     await ExternalProcess.RunAsync(capabilities.Ffmpeg, ["-v", "error", "-i", result.OutputPath, "-f", "null", "-"], TimeSpan.FromSeconds(20), CancellationToken.None);
+                });
+            if (args.Contains("--require-ffmpeg") || registry.Resolve(largeImage, "webp") is not null)
+                await TestAsync("Lossless WebP export resizes and round-trips through FFmpeg", async () =>
+                {
+                    var webp = await media.ConvertAsync(largeImage, "webp", new() { MaxImageEdge = 64 });
+                    var detected = await EngineCapabilities.DetectAsync(new(), source: webp.OutputPath);
+                    var fallback = detected with { HasWindowsImageCodec = false };
+                    using var webpService = new ConversionService(fallback);
+                    var png = await webpService.ConvertAsync(webp.OutputPath, "png", new());
+                    using var file = File.OpenRead(png.OutputPath);
+                    var frame = new PngBitmapDecoder(file, BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
+                    Equal(64, frame.PixelWidth); Equal(32, frame.PixelHeight);
+                    if (detected.HasWindowsImageCodec)
+                    {
+                        using var windows = new ConversionService(detected with { Ffmpeg = null });
+                        var jpeg = await windows.ConvertAsync(webp.OutputPath, "jpg", new());
+                        True(jpeg.OutputBytes > 0);
+                    }
                 });
         }
         if (capabilities.LibreOffice is not null)
@@ -361,11 +471,11 @@ internal static class Program
         return path;
         void Add(string entry, string text) { using var writer = new StreamWriter(archive.CreateEntry(entry).Open()); writer.Write(text); }
     }
-    private static string MakeImage()
+    private static string MakeImage(string name = "sample.png", int width = 32, int height = 24)
     {
-        var path = Path.Combine(Root, "sample.png");
-        var data = new byte[32 * 24 * 4]; for (var i = 0; i < data.Length; i += 4) { data[i] = 240; data[i + 1] = 180; data[i + 2] = 80; data[i + 3] = 255; }
-        var source = BitmapSource.Create(32, 24, 96, 96, PixelFormats.Bgra32, null, data, 32 * 4);
+        var path = Path.Combine(Root, name);
+        var data = new byte[width * height * 4]; for (var i = 0; i < data.Length; i += 4) { data[i] = 240; data[i + 1] = 180; data[i + 2] = 80; data[i + 3] = 255; }
+        var source = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, data, width * 4);
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(source));
         using var stream = File.Create(path); encoder.Save(stream); return path;
     }

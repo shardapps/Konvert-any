@@ -63,12 +63,12 @@ public static class WindowEffects
         DwmSetWindowAttribute(handle, 20, ref dark, sizeof(int));
         var corners = 2;
         DwmSetWindowAttribute(handle, 33, ref corners, sizeof(int));
-        var backdrop = ThemeManager.Current.Glass && !SystemParameters.HighContrast ? 3 : 1;
+        var backdrop = ThemeManager.UsesGlass && OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22621) ? 3 : 1;
         DwmSetWindowAttribute(handle, 38, ref backdrop, sizeof(int));
-        if (backdrop == 3 && HwndSource.FromHwnd(handle) is { } source)
+        if (HwndSource.FromHwnd(handle) is { } source)
         {
-            source.CompositionTarget.BackgroundColor = Colors.Transparent;
-            var margins = new Margins { Left = -1 };
+            source.CompositionTarget.BackgroundColor = backdrop == 3 ? Colors.Transparent : Colors.Black;
+            var margins = new Margins { Left = backdrop == 3 ? -1 : 0 };
             DwmExtendFrameIntoClientArea(handle, ref margins);
         }
     }

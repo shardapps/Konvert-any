@@ -34,9 +34,10 @@ public sealed class ConversionService(EngineCapabilities capabilities) : IDispos
                     await ConvertOfficeAsync(input, staging, extension, cancellationToken);
                     break;
                 case ConversionBackend.Media:
-                    await ConvertMediaAsync(input, staging, route, cancellationToken);
+                    await ConvertMediaAsync(input, staging, route, settings, cancellationToken);
                     break;
                 case ConversionBackend.Image:
+                case ConversionBackend.WindowsImage:
                     await RunStaAsync(() => ImageConverter.Convert(input, staging, extension, settings, cancellationToken), cancellationToken);
                     break;
                 case ConversionBackend.Table:
@@ -114,14 +115,21 @@ public sealed class ConversionService(EngineCapabilities capabilities) : IDispos
         }
     }
 
-    private async Task ConvertMediaAsync(string input, string output, ConversionRoute route, CancellationToken token)
+    private async Task ConvertMediaAsync(string input, string output, ConversionRoute route, ConversionSettings settings, CancellationToken token)
     {
         var threads = Math.Clamp(Environment.ProcessorCount / 2, 1, 4).ToString(CultureInfo.InvariantCulture);
+        string[] audio = route.AudioEncoder is { } encoder && capabilities.HasAudio != false ? ["-c:a", encoder] : [];
+        string[] resize = [];
+        if (route.StillImage && settings.MaxImageEdge > 0)
+        {
+            var edge = settings.MaxImageEdge.ToString(CultureInfo.InvariantCulture);
+            resize = ["-vf", $"scale=w='min(iw,{edge})':h='min(ih,{edge})':force_original_aspect_ratio=decrease:flags=lanczos"];
+        }
         string[] arguments =
         [
             "-hide_banner", "-nostdin", "-loglevel", "error", "-n", "-protocol_whitelist", "file,pipe",
             "-threads", threads, "-filter_threads", threads, "-i", input, "-map_metadata", "-1",
-            .. route.Arguments!, "-threads", threads, output
+            .. route.Arguments!, .. audio, .. resize, "-threads", threads, "-f", route.Muxer!, output
         ];
         await ExternalProcess.RunAsync(capabilities.Ffmpeg!, arguments, TimeSpan.FromMinutes(30), token);
     }

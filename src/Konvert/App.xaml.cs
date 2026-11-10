@@ -53,10 +53,11 @@ public partial class App : Application
             }
             else if (!e.Args[i].StartsWith("--", StringComparison.Ordinal)) input = e.Args[i];
         }
-        ThemeManager.Apply(new SettingsStore().Load().Theme, Resources);
+        var preferences = new SettingsStore().Load();
+        ThemeManager.Apply(preferences.Theme, Resources, reducedTransparency: preferences.ReducedTransparency);
         uiMutex = new Mutex(false, "Local\\Shardapps.Konvert.UI");
         var window = new MainWindow(input, x.HasValue && y.HasValue ? new(x.Value, y.Value, top) : null,
-            e.Args.Contains("--settings"), reportToHost: e.Args.Contains("--shortcut"));
+            e.Args.Contains("--settings"), preferences, reportToHost: e.Args.Contains("--shortcut"));
         MainWindow = window;
         window.Show();
     }

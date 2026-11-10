@@ -1,6 +1,6 @@
 # Konvert project facts
 
-Updated 2026-11-10 for 0.3.2-alpha.1. [shardapps/Konvert-any](https://github.com/shardapps/Konvert-any).
+Updated 2026-11-10 for 0.3.3-alpha.1. [shardapps/Konvert-any](https://github.com/shardapps/Konvert-any).
 
 | Field | Fact |
 | --- | --- |
@@ -10,11 +10,11 @@ Updated 2026-11-10 for 0.3.2-alpha.1. [shardapps/Konvert-any](https://github.com
 | Interaction | Ctrl+K on one selected file opens a 224 DIP circle below the selection when space permits. **Options** reveals extra formats and settings. Clicking away dismisses the popup and allows an active conversion to finish. |
 | Persistent component | Small C++20 event-driven shortcut listener with tray pause/quit |
 | Transient component | .NET 10/WPF conversion UI; no embedded browser |
-| Themes | Glass default; Pearl, Graphite, Midnight, Ocean, Lavender, Forest |
+| Themes | Glass default with translucency, a solid fallback, and reduced-motion support. Pearl, Graphite, Midnight, Ocean, Lavender, Forest. |
 | Installers | Compact x64 and ARM64 setup EXEs. Runtime preflight, in-place upgrades and exact-match cleanup of known legacy files. |
 | Default install directory | %LOCALAPPDATA%\\Programs\\Shardapps\\Konvert |
-| Native conversions | Images/image PDF, raw text/HTML, DOCX text, CSV/TSV/flat JSON |
-| Optional conversions | LibreOffice office exports and FFmpeg media exports |
+| Native conversions | Images, six-size ICO, image PDF, raw text/HTML, DOCX/ODT text, CSV/TSV/flat JSON |
+| Optional conversions | Windows codecs for modern image input, LibreOffice for layout-aware Office export, FFmpeg for audio, video, and WebP |
 | Output | Beside original or configured directory; no overwrite |
 | Privacy | Local processing; no app telemetry, accounts or upload backend |
 | License | Apache-2.0 |

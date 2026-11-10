@@ -7,6 +7,18 @@ namespace Konvert;
 
 internal static class Ui
 {
+    internal static IReadOnlyList<int> ImageSizeLimits { get; } = [0, 512, 1080, 1920, 2560, 3840];
+
+    internal static string ImageSizeLabel(int index) =>
+        ImageSizeLimits[index] == 0 ? "Original" : $"Up to {ImageSizeLimits[index]} px";
+
+    internal static int ImageSizeIndex(int edge)
+    {
+        for (var index = 0; index < ImageSizeLimits.Count; index++)
+            if (ImageSizeLimits[index] >= edge) return index;
+        return ImageSizeLimits.Count - 1;
+    }
+
     public static TextBlock Text(string value, double size = 14, string color = "Ink", FontWeight? weight = null)
     {
         var text = new TextBlock { Text = value, FontSize = size, FontWeight = weight ?? FontWeights.Normal, TextWrapping = TextWrapping.Wrap };
@@ -50,19 +62,33 @@ internal static class Ui
         "csv" => "Comma-separated values",
         "tsv" => "Tab-separated values",
         "jpg" => "JPEG image",
+        "ico" => "Windows icon",
+        "webp" => "WebP image",
+        "ts" => "MPEG transport stream",
+        "caf" => "Core Audio file",
         "json" => "JSON data",
         _ => $"{extension.ToUpperInvariant()} {FormatCategory(extension).ToLowerInvariant()}"
     };
 
     public static string FormatCategory(string extension) => extension switch
     {
-        "png" or "jpg" or "bmp" or "tiff" or "gif" => "Image",
+        "png" or "jpg" or "bmp" or "tiff" or "gif" or "ico" or "webp" or "avif" or "heif" or "heic" or "wdp" => "Image",
         "txt" or "html" or "rtf" => "Text",
         "csv" or "tsv" or "xlsx" or "ods" => "Table",
         "pptx" or "odp" => "Slides",
-        "mp3" or "wav" or "flac" or "ogg" or "m4a" or "opus" => "Audio",
-        "mp4" or "webm" or "mkv" => "Video",
+        "mp3" or "wav" or "flac" or "ogg" or "m4a" or "opus" or "aac" or "aiff" or "caf" => "Audio",
+        "mp4" or "webm" or "mkv" or "mov" or "avi" or "ts" => "Video",
         "json" => "Data",
         _ => "Document"
+    };
+
+    public static string FormatIcon(string extension) => FormatCategory(extension) switch
+    {
+        "Image" => "image",
+        "Audio" => "audio",
+        "Video" => "video",
+        "Table" or "Data" => "table",
+        "Slides" => "slides",
+        _ => "file"
     };
 }

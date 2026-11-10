@@ -1,14 +1,17 @@
 <Application x:Class="Konvert.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Application.Resources>
-    <SolidColorBrush x:Key="Chrome" Color="#F214202C"/><SolidColorBrush x:Key="Surface" Color="#FC1C2B39"/>
-    <SolidColorBrush x:Key="Raised" Color="#293D4E"/><SolidColorBrush x:Key="Ink" Color="#F4F9FD"/>
-    <SolidColorBrush x:Key="Muted" Color="#C1D5E5"/><SolidColorBrush x:Key="Accent" Color="#A9E8FA"/>
-    <SolidColorBrush x:Key="Outline" Color="#577084"/>
-    <SolidColorBrush x:Key="CoreFill" Color="#FC1C2B39"/>
-    <SolidColorBrush x:Key="StateTint" Color="#28A9E8FA"/>
-    <SolidColorBrush x:Key="TooltipFill" Color="#1C2B39"/>
+    <SolidColorBrush x:Key="Chrome" Color="#F2182634"/><SolidColorBrush x:Key="Surface" Color="#162837"/>
+    <SolidColorBrush x:Key="Raised" Color="#284457"/><SolidColorBrush x:Key="Ink" Color="#F4F9FD"/>
+    <SolidColorBrush x:Key="Muted" Color="#C1D5E5"/><SolidColorBrush x:Key="Accent" Color="#ADEBFF"/>
+    <SolidColorBrush x:Key="Outline" Color="#68889C"/>
+    <SolidColorBrush x:Key="CoreFill" Color="#162837"/>
+    <SolidColorBrush x:Key="StateTint" Color="#28ADEBFF"/>
+    <SolidColorBrush x:Key="TooltipFill" Color="#162837"/>
     <SolidColorBrush x:Key="OnAccent" Color="#101820"/>
-    <LinearGradientBrush x:Key="GlassHighlight" StartPoint="0,0" EndPoint="0.25,0.82"><GradientStop Color="#1DFFFFFF"/><GradientStop Color="#00FFFFFF" Offset="1"/></LinearGradientBrush>
+    <SolidColorBrush x:Key="LensFill" Color="#96203147"/>
+    <SolidColorBrush x:Key="LensRim" Color="#D5A6E2FF"/>
+    <SolidColorBrush x:Key="LensBevel" Color="#438FC6EA"/>
+    <SolidColorBrush x:Key="LensLight" Color="Transparent"/>
     <Style TargetType="Window"><Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI"/><Setter Property="FontSize" Value="14"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="Background" Value="{DynamicResource Chrome}"/></Style>
     <Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Ink}"/></Style>
     <Style TargetType="ToolTip">
