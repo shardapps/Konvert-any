@@ -15,9 +15,9 @@
 
 </div>
 
-Konvert is a free, open source **Windows file converter** by **Shardapps**. Select one file in Explorer or on the desktop and press **Ctrl+K**. A compact radial popup appears around the selection, with the source at its center and destination formats around it. Choose a format to create a separate converted file beside the original, or in your preferred folder.
+Konvert is a free, open source **Windows file converter** by **Shardapps**. Select one file in Explorer or on the desktop and press **Ctrl+K**. A 224 DIP circle presents up to three available formats around the source. Pick one to save beside the original at standard quality. Use the bottom chevron to reveal every route, a folder picker, JPEG quality, and image DPI.
 
-**0.2 alpha:** native shortcut listener, file-centered popup, seven themes and conventional **x64 / ARM64 setup EXEs**. GitHub previews are unsigned. Microsoft Store publication and physical ARM64 validation remain separate release work.
+**0.3 alpha** brings a smaller radial menu, a shared conversion catalog, and compact **x64 and ARM64 setup EXEs**. The installer uses the shared Microsoft .NET 10 Desktop Runtime.
 
 ## Stay in your flow
 
@@ -46,14 +46,14 @@ The design takes principles from Apple's floating material layers and Material's
 | Presentations | PPTX, PPT, ODP → PDF and presentation formats | Local LibreOffice |
 | Audio/video | MP4 → MP3, WAV → FLAC, video → MP4/WebM/GIF and more | Local FFmpeg |
 
-Native routes work immediately. Office and media engines are separate installations to keep the base application smaller. Missing-engine routes stay visible with **Add engine**, which opens setup guidance; they are not presented as working conversions. FFmpeg output encoders are probed before use.
+Native routes work immediately. Office and media engines are separate installations. The expanded menu links unavailable routes to converter setup. For media, Konvert checks FFmpeg encoders and uses FFprobe when present to detect which streams are available.
 
 Formats are not interchangeable without consequences. Lossy codecs, office layout/fonts, first-frame image exports and flat-table restrictions are documented in the [exact format matrix](docs/FORMATS.md). PDF input/OCR, WebP/HEIC exports and batches are not implemented yet. No “anything to anything without loss” claim is made.
 
 ## Install
 
-1. Get **Konvert-Setup-0.2.0-alpha.1-x64.exe** for Intel/AMD Windows, or **Konvert-Setup-0.2.0-alpha.1-arm64.exe** for Windows on Arm from [Releases](https://github.com/shardapps/Konvert-any/releases). PR previews are also available in successful [CI artifacts](https://github.com/shardapps/Konvert-any/actions/workflows/ci.yml).
-2. Setup installs for the current user under **%LOCALAPPDATA%\\Programs\\Shardapps\\Konvert** and includes the .NET Desktop Runtime. No separate runtime installation is required.
+1. Pick **x64** for Intel/AMD Windows or **ARM64** for Windows on Arm. Find packages in [Releases](https://github.com/shardapps/Konvert-any/releases) or successful [CI artifacts](https://github.com/shardapps/Konvert-any/actions/workflows/ci.yml).
+2. Install the matching [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) if setup asks for it. Uninstall the previous standalone alpha before installing the compact setup. Konvert installs under **%LOCALAPPDATA%\\Programs\\Shardapps\\Konvert** by default and keeps preferences in a separate directory.
 3. Choose Explorer/PATH integration and startup preferences in setup. Ctrl+K is ready after the listener starts; open a **new terminal** to pick up PATH changes.
 4. Select one file in Explorer and press **Ctrl+K**. For office/media exports, open **Settings → Converters** and configure LibreOffice/FFmpeg.
 
@@ -63,7 +63,7 @@ Windows 11 is the support target. ARM64 packages contain native ARM64 app/runtim
 
 No accounts, uploads, ads or telemetry. Preferences remain local. Original and existing files are protected by staged outputs and no-overwrite commits. Heavy conversion runs away from the UI thread; only one heavy job runs per process. Text/diagnostics use bounded buffers, and native image/table sizes have explicit limits.
 
-The resident component is a small **C++20 Win32 listener**; the **.NET 10/WPF UI is transient**. No embedded browser or third-party application NuGet packages. Setup includes the runtime, while conversion engines remain separate. [Measurements and methodology](docs/PERFORMANCE.md) distinguish idle listener memory from visible UI and active conversion.
+The resident component is a small **C++20 Win32 listener**. The **.NET 10/WPF UI** opens on demand. The compact installer contains the app and listener. The separate MSIX build includes its runtime. [Measurements and methodology](docs/PERFORMANCE.md).
 
 ## From a terminal
 

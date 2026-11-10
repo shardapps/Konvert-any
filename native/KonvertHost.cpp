@@ -39,10 +39,10 @@ std::wstring Quote(const std::wstring& value) {
     return result + L'\"';
 }
 
-std::wstring ApplicationPath() {
+std::wstring OwnPath() {
     std::vector<wchar_t> buffer(32768);
     const DWORD count = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
-    return (std::filesystem::path(std::wstring(buffer.data(), count)).parent_path() / L"Konvert.exe").wstring();
+    return std::wstring(buffer.data(), count);
 }
 
 bool IsExplorer(HWND window) {
@@ -116,7 +116,9 @@ bool SelectedFile(Selection& selection) {
     GetClassNameW(foreground, foregroundClass, 128);
     if (wcscmp(foregroundClass, L"Progman") != 0 && wcscmp(foregroundClass, L"WorkerW") != 0) return false;
     // Desktop selections are exposed separately from ordinary Explorer windows.
-    VARIANT location{}, root{}; location.vt = root.vt = VT_I4; location.lVal = CSIDL_DESKTOP;
+    VARIANT location{}, root{};
+    location.vt = VT_I4;
+    location.lVal = CSIDL_DESKTOP;
     long desktopHandle{};
     ComPtr<IDispatch> desktop;
     if (SUCCEEDED(windows->FindWindowSW(&location, &root, SWC_DESKTOP, &desktopHandle, SWFO_NEEDDISPATCH, &desktop)) && desktop) {
@@ -149,24 +151,26 @@ void CALLBACK ForegroundEvent(HWINEVENTHOOK, DWORD, HWND, LONG, LONG, DWORD, DWO
     PostMessageW(hostWindow, ForegroundChanged, 0, 0);
 }
 
-void Launch(const std::wstring& arguments) {
-    const std::wstring executable = ApplicationPath();
+void Launch(const std::wstring& arguments, bool trackPopup = false) {
+    const auto executable = (std::filesystem::path(OwnPath()).parent_path() / L"Konvert.exe").wstring();
     std::wstring command = Quote(executable) + L" " + arguments;
     STARTUPINFOW startup{sizeof(startup)};
     PROCESS_INFORMATION process{};
     if (CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &process)) {
         CloseHandle(process.hThread);
-        if (popupProcess) CloseHandle(popupProcess);
-        popupProcess = process.hProcess;
+        if (trackPopup) {
+            if (popupProcess) CloseHandle(popupProcess);
+            popupProcess = process.hProcess;
+        } else CloseHandle(process.hProcess);
     } else Notify(L"Konvert.exe could not be opened. Repair or reinstall Konvert.");
 }
 
 void OpenSelection() {
+    if (popupProcess && WaitForSingleObject(popupProcess, 0) == WAIT_TIMEOUT) return;
     Selection selection;
     if (!SelectedFile(selection)) { Notify(L"Select one local file in Explorer or on the desktop, then press Ctrl+K."); return; }
-    if (popupProcess && WaitForSingleObject(popupProcess, 0) == WAIT_TIMEOUT) return;
     Launch(L"--popup --anchor-x " + std::to_wstring(selection.anchor.x) + L" --anchor-y " +
-        std::to_wstring(selection.anchor.y) + L" " + Quote(selection.path));
+        std::to_wstring(selection.anchor.y) + L" " + Quote(selection.path), true);
 }
 
 LRESULT CALLBACK WindowProcedure(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
@@ -209,9 +213,19 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     if (exitRequested) {
         if (HWND window = FindWindowExW(HWND_MESSAGE, nullptr, WindowClass, nullptr)) {
             DWORD processId{}; GetWindowThreadProcessId(window, &processId);
-            HANDLE process = OpenProcess(SYNCHRONIZE, FALSE, processId);
-            PostMessageW(window, WM_CLOSE, 0, 0);
-            if (process) { const DWORD result = WaitForSingleObject(process, 5000); CloseHandle(process); if (result == WAIT_TIMEOUT) return 2; }
+            HANDLE process = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+            if (!process) return 2;
+            std::vector<wchar_t> path(32768);
+            DWORD length = static_cast<DWORD>(path.size());
+            const bool owned = QueryFullProcessImageNameW(process, 0, path.data(), &length) &&
+                _wcsicmp(path.data(), OwnPath().c_str()) == 0;
+            DWORD result = WAIT_OBJECT_0;
+            if (owned) {
+                PostMessageW(window, WM_CLOSE, 0, 0);
+                result = WaitForSingleObject(process, 5000);
+            }
+            CloseHandle(process);
+            if (result != WAIT_OBJECT_0) return 2;
         }
         return 0;
     }

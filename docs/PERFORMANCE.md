@@ -14,7 +14,7 @@ The goal is quick, unobtrusive conversion. No universal startup, memory or conve
 - Conversion runs on a worker thread or asynchronous child process. A process-local semaphore permits one heavy job. Separate app processes can still overlap.
 - Image metadata is checked before decode; 24 megapixels maximum. One normalized render surface avoids a full managed pixel-array copy. Native decoder/render allocations remain significant for large images.
 - Streaming text uses an 8 KiB character buffer. CSV/TSV rows are yielded and written incrementally. Input text and JSON documents remain in memory, bounded to 16 MiB input, 100,000 rows and 1,000 columns; JSON structures can use several times their file size.
-- FFmpeg requests two codec threads and two filter threads; codecs can allocate additional internal resources. LibreOffice is a larger optional process, with a fresh profile per conversion.
+- FFmpeg requests one to four codec and filter threads based on available logical processors. Codecs can allocate additional resources. LibreOffice uses a fresh profile per conversion.
 - Both engine pipes drain concurrently; retained diagnostics are capped at 64 KiB per stream. Native codec calls cannot be interrupted until returning; external processes have deadlines and cancellation.
 
 ## Reproduce idle measurement

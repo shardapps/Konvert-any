@@ -11,20 +11,28 @@ internal static class TableConverter
 
     public static IEnumerable<string[]> Parse(string text, char delimiter, CancellationToken token = default)
     {
+        using var reader = new StringReader(text);
+        foreach (var row in Parse(reader, delimiter, token)) yield return row;
+    }
+
+    private static IEnumerable<string[]> Parse(TextReader reader, char delimiter, CancellationToken token)
+    {
         var rowCount = 0;
         var row = new List<string>();
         var field = new StringBuilder();
         var quoted = false;
         var closedQuote = false;
-        for (var i = 0; i < text.Length; i++)
+        var offset = 0;
+        int next;
+        while ((next = reader.Read()) != -1)
         {
-            if ((i & 4095) == 0) token.ThrowIfCancellationRequested();
-            var c = text[i];
+            if ((offset++ & 4095) == 0) token.ThrowIfCancellationRequested();
+            var c = (char)next;
             if (quoted)
             {
                 if (c == '"')
                 {
-                    if (i + 1 < text.Length && text[i + 1] == '"') { field.Append('"'); i++; }
+                    if (reader.Peek() == '"') { field.Append('"'); reader.Read(); }
                     else { quoted = false; closedQuote = true; }
                 }
                 else field.Append(c);
@@ -34,7 +42,7 @@ internal static class TableConverter
             if (c == delimiter) { AddField(); continue; }
             if (c is '\r' or '\n')
             {
-                if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n') i++;
+                if (c == '\r' && reader.Peek() == '\n') reader.Read();
                 yield return AddRow();
                 continue;
             }
@@ -60,6 +68,8 @@ internal static class TableConverter
 
     public static void Convert(string input, string output, string source, string target, CancellationToken token)
     {
+        if (new FileInfo(input).Length > TextConverter.MaxInputBytes)
+            throw new InvalidDataException("Table inputs are limited to 16 MiB.");
         if (source == "json")
         {
             using var document = JsonDocument.Parse(File.ReadAllText(input));
@@ -89,7 +99,8 @@ internal static class TableConverter
             }
             return;
         }
-        var rows = Parse(File.ReadAllText(input), source == "tsv" ? '\t' : ',', token);
+        using var inputReader = new StreamReader(input, new UTF8Encoding(false, true), detectEncodingFromByteOrderMarks: true);
+        var rows = Parse(inputReader, source == "tsv" ? '\t' : ',', token);
         if (target == "json")
         {
             using var iterator = rows.GetEnumerator();

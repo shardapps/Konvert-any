@@ -1,8 +1,8 @@
-# Design direction · 0.2
+# Design direction
 
-Konvert's main interaction is a temporary radial popup around the selected file, rather than a full application window. Ctrl+K reads one selected filesystem item from the active Explorer view or desktop. Source identity stays in the center; destination formats orbit it. Escape and an outside click dismiss idle popups. Work-area clamping keeps the menu on-screen, including monitors with negative coordinates.
+Ctrl+K reads one selected filesystem item from the active Explorer view or desktop. A 224 DIP circle shows its type in the center with up to three destination formats around it. A bottom chevron reveals the format list, output folder, quality and DPI. Escape closes the drawer before dismissing the popup. Clicking outside dismisses an idle popup.
 
-The default Glass theme uses translucent surfaces, luminous edges and short entrance motion. It is inspired by Apple's separation of floating controls from content and Material's hierarchy, color roles and approachable shapes. This is an original Windows implementation, not Apple's Liquid Glass renderer. It does not capture the screen to synthesize refraction. Windows acrylic is used for eligible settings/home windows; the shaped popup uses per-pixel alpha. High contrast replaces themed colors, and reduced motion disables entrance animation.
+Glass uses a translucent disc, a static highlight and distinct focus outlines. It draws on Apple's floating controls and Material's hierarchy and color roles. Windows acrylic is used for eligible settings windows. The shaped popup uses per-pixel alpha and respects system high contrast.
 
 Seven themes: Glass, Pearl, Graphite, Midnight, Ocean, Lavender and Forest. All icons are original 24-unit vector paths in `IconControl.cs`; buttons, sliders, switches, text fields and scrollbar templates are maintained in `App.xaml`. Shared color roles keep controls consistent across themes. A separate settings window uses a sidebar for Appearance, Conversion, Windows, Converters and About.
 

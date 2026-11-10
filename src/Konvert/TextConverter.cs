@@ -12,8 +12,6 @@ internal static class TextConverter
     public static void Convert(string input, string output, string source, string target, CancellationToken token)
     {
         if (new FileInfo(input).Length > MaxInputBytes) throw new InvalidDataException("Text and table inputs are limited to 16 MiB in this alpha.");
-        if (source is "csv" or "tsv" && target is "json" or "csv" or "tsv" || source == "json" && target == "csv")
-        { TableConverter.Convert(input, output, source, target, token); return; }
         if (source == "docx") { ExtractDocx(input, output, token); return; }
         // Strict UTF-8 avoids silently replacing invalid bytes. BOM-marked UTF-16/32 is detected.
         using var reader = new StreamReader(input, new UTF8Encoding(false, true), true);

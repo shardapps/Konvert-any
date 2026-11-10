@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory)][string]$IdentityName,
     [Parameter(Mandatory)][string]$Publisher,
-    [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')][string]$Version = '0.2.0.0',
+    [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')][string]$Version = '0.3.0.0',
     [ValidateSet('x64','arm64')][string]$Architecture = 'x64',
     [string]$Dotnet = 'dotnet'
 )

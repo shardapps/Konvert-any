@@ -10,9 +10,10 @@ function Install-TestCopy {
     $process=Start-Process -FilePath $setup -ArgumentList ('/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR="'+$target+'" /TASKS="!startup,!integration,!desktopicon"') -PassThru
     if (!$process.WaitForExit(180000)) { throw 'Setup did not finish within three minutes.' }
     if ($process.ExitCode) { throw "Setup failed: $($process.ExitCode)" }
-    foreach ($name in @('Konvert.exe','KonvertHost.exe','hostfxr.dll','unins000.exe','licenses')) {
+    foreach ($name in @('Konvert.exe','KonvertHost.exe','Konvert.runtimeconfig.json','unins000.exe')) {
         if (!(Test-Path -LiteralPath (Join-Path $target $name))) { throw "Installed payload missing $name" }
     }
+    if (Test-Path -LiteralPath (Join-Path $target 'hostfxr.dll')) { throw 'Compact setup includes a private runtime.' }
 }
 if (Test-Path -LiteralPath $target) { throw 'Use a clean installer test directory; refusing to overwrite an unknown previous install.' }
 $originalPath=[Environment]::GetEnvironmentVariable('PATH','User')
@@ -22,7 +23,13 @@ try {
     Install-TestCopy # Upgrade/repair the same per-user installation.
     $test=Start-Process (Join-Path $target 'KonvertHost.exe') -ArgumentList '--self-test' -Wait -PassThru
     if ($test.ExitCode) { throw 'Installed native listener self-test failed.' }
-    Write-Output 'PASS per-user install, complete runtime, repair/upgrade and native listener'
+    $inputFile = Join-Path $target 'installer-fixture.txt'
+    Set-Content -LiteralPath $inputFile -Value 'Installer conversion check'
+    $conversion = Start-Process (Join-Path $target 'Konvert.exe') -ArgumentList ('--convert "' + $inputFile + '" --to html') -WindowStyle Hidden -PassThru
+    if (!$conversion.WaitForExit(30000) -or $conversion.ExitCode) { throw 'Installed conversion failed.' }
+    if ((Get-Content -LiteralPath ([IO.Path]::ChangeExtension($inputFile,'html')) -Raw) -notmatch 'Installer conversion check') { throw 'Installed conversion produced invalid HTML.' }
+    Remove-Item -LiteralPath $inputFile,([IO.Path]::ChangeExtension($inputFile,'html'))
+    Write-Output 'PASS compact install, repair, native listener and installed text conversion'
 } finally {
     $uninstall=Join-Path $target 'unins000.exe'
     if (Test-Path -LiteralPath $uninstall) {

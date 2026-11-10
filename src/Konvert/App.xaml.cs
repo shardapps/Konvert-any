@@ -58,12 +58,12 @@ public partial class App : Application
         {
             if (args[0] == "--help")
             {
-                Console.WriteLine("Konvert 0.2 alpha | --formats <file> | --convert <file> --to <format> [--output <folder>]\nPass a file to open its radial popup. Ctrl+K works in Explorer with KonvertHost running. --settings opens preferences. Existing files are never overwritten.");
+                Console.WriteLine("Konvert | --formats <file> | --convert <file> --to <format> [--output <folder>]\nPass a file to open its radial popup. Ctrl+K works in Explorer with KonvertHost running. --settings opens preferences. Existing files are never overwritten.");
                 return 0;
             }
             if (args.Length < 2) throw new ArgumentException("Supply an input file.");
             var settings = new SettingsStore().Load();
-            var capabilities = await EngineCapabilities.DetectAsync(settings);
+            var capabilities = await EngineCapabilities.DetectAsync(settings, source: args[1]);
             if (args[0] == "--formats")
             {
                 Console.WriteLine(string.Join(Environment.NewLine, new FormatRegistry(capabilities).GetTargets(args[1]).Select(t => $"{t.Extension}\t{t.Engine}\t{t.Detail}")));

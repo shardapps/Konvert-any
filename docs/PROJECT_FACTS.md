@@ -1,17 +1,17 @@
 # Konvert project facts
 
-Updated 2026-10-25 for 0.2.0-alpha.1. Canonical repository: [shardapps/Konvert-any](https://github.com/shardapps/Konvert-any).
+Updated 2026-11-10 for 0.3.0-alpha.1. [shardapps/Konvert-any](https://github.com/shardapps/Konvert-any).
 
 | Field | Fact |
 | --- | --- |
 | Product | Konvert, by Shardapps |
 | Category | Local Windows file converter |
 | Platform | Windows 11; x64 and native ARM64 builds; physical ARM64 verification pending |
-| Interaction | Select one Explorer/desktop file, press Ctrl+K, choose a destination in a radial popup |
+| Interaction | Ctrl+K on one selected file opens a 224 DIP circle. A chevron reveals extra formats and per-conversion settings. |
 | Persistent component | Small C++20 event-driven shortcut listener with tray pause/quit |
 | Transient component | .NET 10/WPF conversion UI; no embedded browser |
 | Themes | Glass default; Pearl, Graphite, Midnight, Ocean, Lavender, Forest |
-| Installers | Per-user self-contained setup EXEs for x64 and ARM64 |
+| Installers | Compact per-user setup EXEs for x64 and ARM64. Shared .NET 10 Desktop Runtime required. |
 | Default install directory | %LOCALAPPDATA%\\Programs\\Shardapps\\Konvert |
 | Native conversions | Images/image PDF, raw text/HTML, DOCX text, CSV/TSV/flat JSON |
 | Optional conversions | LibreOffice office exports and FFmpeg media exports |
