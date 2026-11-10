@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.3-alpha.1
+
+- Give Glass a more translucent lens with a lit edge, original format icons, and eased entry and drawer transitions. Honor Windows transparency settings and add a Reduce transparency preference.
+- Dismiss the first-launch picker on an outside click. Give it direct Choose file and Settings actions. Group expanded formats and add a maximum image size option.
+- Add built-in ICO export, ODT text extraction, and flat JSON → TSV. Offer WebP, HEIC/HEIF, and AVIF input when a Windows decoder can read the file.
+- Add optional lossless WebP export and AAC, AIFF, CAF, MOV, AVI, and MPEG-TS. Check FFmpeg containers as well as encoders.
+
 ## 0.3.2-alpha.1
 
 - Anchor the Ctrl+K popup beneath the selected item when space permits. Clicking away dismisses the popup during any state and lets an active export finish.
@@ -40,4 +47,4 @@ Unsigned alpha; Microsoft Store publication and physical ARM64 testing remain se
 - Regression/engine tests, Windows CI, x64/ARM64 packages, CodeQL and Store packaging groundwork.
 - Open source policies, project facts, visual README and documented format limits.
 
-Not released to Store. Production signing, batches, PDF input, WebP/HEIC export and modern packaged Explorer integration remain planned.
+Store publication, production signing, batches, PDF input, HEIC export, and modern packaged Explorer integration remain planned.

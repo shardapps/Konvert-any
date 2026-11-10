@@ -7,6 +7,21 @@ using Konvert;
 
 internal static class PickerTests
 {
+    public static void VerifyHomeDismissal()
+    {
+        var home = new MainWindow(preferences: new());
+        var closed = false;
+        home.Closed += (_, _) => closed = true;
+        try
+        {
+            _ = FindButton(home, "Choose a file");
+            _ = FindButton(home, "Open settings");
+            home.DismissPopup();
+            Require(closed, "Click-away must dismiss the first-launch picker.");
+        }
+        finally { if (!closed) home.Close(); }
+    }
+
     public static void VerifyRecovery(string directory)
     {
         var missing = new MainWindow(Path.Combine(directory, "missing.csv"), preferences: new());

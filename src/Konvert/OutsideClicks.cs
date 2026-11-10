@@ -5,7 +5,7 @@ using System.Windows.Threading;
 
 namespace Konvert;
 
-// Watch button-down events only while a file popup is visible. Never consume or retain the input.
+// Watch button-down events only while the popup is visible. Never consume or retain the input.
 internal sealed class OutsideClicks : IDisposable
 {
     private readonly MouseHook callback;
@@ -19,7 +19,8 @@ internal sealed class OutsideClicks : IDisposable
             if (code >= 0 && message.ToInt64() is 0x0201 or 0x0204 or 0x0207 or 0x020B)
             {
                 var hit = WindowFromPoint(Marshal.PtrToStructure<ScreenPoint>(data));
-                if (hit != handle && GetAncestor(hit, 2) != handle)
+                const uint RootOwner = 3;
+                if (hit != handle && GetAncestor(hit, RootOwner) != handle)
                     window.Dispatcher.BeginInvoke(DispatcherPriority.Input, dismiss);
             }
             return CallNextHookEx(IntPtr.Zero, code, message, data);

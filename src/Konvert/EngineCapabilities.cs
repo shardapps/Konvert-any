@@ -8,27 +8,36 @@ public sealed record EngineCapabilities(string? LibreOffice, string? Ffmpeg, IRe
     public static EngineCapabilities None { get; } = new(null, null, FrozenSet<string>.Empty);
     public bool? HasAudio { get; init; }
     public bool? HasVideo { get; init; }
+    internal IReadOnlySet<string>? Muxers { get; init; }
+    internal bool HasWindowsImageCodec { get; init; }
 
     public static async Task<EngineCapabilities> DetectAsync(
         ConversionSettings settings, CancellationToken cancellationToken = default, string? source = null)
     {
         var installed = Locate(settings, source);
+        if (source is not null && FormatRegistry.Uses(source, ConversionBackend.WindowsImage))
+        {
+            var supported = await Task.Run(() => ImageConverter.CanDecode(source), cancellationToken);
+            installed = installed with { HasWindowsImageCodec = supported };
+        }
         var ffmpeg = installed.Ffmpeg;
         if (ffmpeg is null) return installed;
 
-        var encoders = new HashSet<string>(StringComparer.Ordinal);
+        EngineCapabilities capabilities;
         try
         {
-            var output = await ExternalProcess.RunAsync(ffmpeg, ["-hide_banner", "-encoders"], TimeSpan.FromSeconds(8), cancellationToken);
-            foreach (var line in output.StandardOutput.Split('\n'))
+            var deadline = TimeSpan.FromSeconds(8);
+            var results = await Task.WhenAll(
+                ExternalProcess.RunAsync(ffmpeg, ["-hide_banner", "-encoders"], deadline, cancellationToken),
+                ExternalProcess.RunAsync(ffmpeg, ["-hide_banner", "-muxers"], deadline, cancellationToken));
+            capabilities = installed with
             {
-                var parts = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length > 1 && parts[0].Length == 6) encoders.Add(parts[1]);
-            }
+                Encoders = ReadCapabilities(results[0].StandardOutput, flags => flags.Length == 6),
+                Muxers = ReadCapabilities(results[1].StandardOutput, flags => flags is "E" or ".E" or "DE")
+            };
         }
         catch (Exception ex) when (ProbeFailed(ex)) { return installed with { Ffmpeg = null }; }
 
-        var capabilities = installed with { Encoders = encoders.ToFrozenSet(StringComparer.Ordinal) };
         var probe = Path.Combine(Path.GetDirectoryName(ffmpeg)!, "ffprobe.exe");
         if (source is null || !File.Exists(probe) || !File.Exists(source)) return capabilities;
 
@@ -48,6 +57,18 @@ public sealed record EngineCapabilities(string? LibreOffice, string? Ffmpeg, IRe
             };
         }
         catch (Exception ex) when (ProbeFailed(ex) || ex is JsonException or KeyNotFoundException) { return capabilities; }
+    }
+
+    private static FrozenSet<string> ReadCapabilities(string output, Func<string, bool> acceptsFlags)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var line in output.Split('\n'))
+        {
+            var parts = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 1 && acceptsFlags(parts[0]) && parts[1] != "=")
+                names.UnionWith(parts[1].Split(','));
+        }
+        return names.ToFrozenSet(StringComparer.Ordinal);
     }
 
     internal static EngineCapabilities Locate(ConversionSettings settings, string? source = null)

@@ -73,7 +73,7 @@ internal static class TableConverter
         if (source == "json")
         {
             using var document = JsonDocument.Parse(File.ReadAllText(input));
-            if (document.RootElement.ValueKind != JsonValueKind.Array) throw new InvalidDataException("CSV export needs a JSON array of flat objects.");
+            if (document.RootElement.ValueKind != JsonValueKind.Array) throw new InvalidDataException("Table export needs a JSON array of flat objects.");
             if (document.RootElement.GetArrayLength() > MaxRows) throw new InvalidDataException("Tables are limited to 100,000 rows.");
             var columns = new List<string>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -85,17 +85,18 @@ internal static class TableConverter
                 foreach (var property in item.EnumerateObject())
                 {
                     if (!keys.Add(property.Name)) throw new InvalidDataException("JSON rows cannot contain duplicate keys.");
-                    if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array) throw new InvalidDataException("Nested JSON cannot be represented as a flat CSV table.");
+                    if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array) throw new InvalidDataException("Nested JSON cannot be represented as a flat table.");
                     if (seen.Add(property.Name)) columns.Add(property.Name);
                     if (columns.Count > MaxColumns) throw new InvalidDataException("Tables are limited to 1,000 columns.");
                 }
             }
             using var writer = new StreamWriter(output, false, new UTF8Encoding(false));
-            WriteRow(writer, columns, ',');
+            var delimiter = target == "tsv" ? '\t' : ',';
+            WriteRow(writer, columns, delimiter);
             foreach (var item in document.RootElement.EnumerateArray())
             {
                 token.ThrowIfCancellationRequested();
-                WriteRow(writer, columns.Select(column => item.TryGetProperty(column, out var value) ? Scalar(value) : ""), ',');
+                WriteRow(writer, columns.Select(column => item.TryGetProperty(column, out var value) ? Scalar(value) : ""), delimiter);
             }
             return;
         }

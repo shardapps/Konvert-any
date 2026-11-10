@@ -20,11 +20,14 @@ public sealed class SettingsWindow : Window
     private string selectedTheme;
     private readonly Slider quality = new() { Minimum = 10, Maximum = 100, TickFrequency = 5, IsSnapToTickEnabled = true };
     private readonly Slider dpi = new() { Minimum = 72, Maximum = 600 };
+    private readonly Slider size = new() { Minimum = 0, Maximum = Ui.ImageSizeLimits.Count - 1, TickFrequency = 1, IsSnapToTickEnabled = true };
     private readonly TextBox folder = new(), office = new(), ffmpeg = new();
     private readonly CheckBox motion = new() { Content = "Reduce motion" };
+    private readonly CheckBox transparency = new() { Content = "Reduce transparency" };
     private readonly CheckBox startup = new() { Content = "Keep Ctrl+K ready when I sign in" };
     private readonly TextBlock qualityLabel = Ui.Text("", 14, weight: FontWeights.SemiBold);
     private readonly TextBlock dpiLabel = Ui.Text("", 14, weight: FontWeights.SemiBold);
+    private readonly TextBlock sizeLabel = Ui.Text("", 14, weight: FontWeights.SemiBold);
     private bool committed;
     public ConversionSettings Settings { get; private set; }
 
@@ -39,17 +42,24 @@ public sealed class SettingsWindow : Window
         MinHeight = Math.Min(420, Height);
         WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.CanResizeWithGrip; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         quality.Value = settings.JpegQuality; dpi.Value = settings.Dpi; folder.Text = settings.OutputDirectory ?? "";
+        size.Value = Ui.ImageSizeIndex(settings.MaxImageEdge);
+        sizeLabel.Text = $"Image size · {Ui.ImageSizeLabel((int)size.Value)}";
         qualityLabel.Text = $"JPEG / image PDF quality · {quality.Value:0}%";
         dpiLabel.Text = $"Print size · {dpi.Value:0} DPI";
         quality.ValueChanged += (_, _) => qualityLabel.Text = $"JPEG / image PDF quality · {quality.Value:0}%";
         dpi.ValueChanged += (_, _) => dpiLabel.Text = $"Print size · {dpi.Value:0} DPI";
+        size.ValueChanged += (_, _) => sizeLabel.Text = $"Image size · {Ui.ImageSizeLabel((int)size.Value)}";
         office.Text = settings.LibreOfficePath ?? ""; ffmpeg.Text = settings.FfmpegPath ?? ""; motion.IsChecked = settings.ReducedMotion;
+        transparency.IsChecked = settings.ReducedTransparency;
+        transparency.Checked += (_, _) => PreviewTheme();
+        transparency.Unchecked += (_, _) => PreviewTheme();
         startup.IsChecked = NativeHostIntegration.StartsWithWindows;
         AutomationProperties.SetName(folder, "Output folder. Blank saves beside the original.");
         AutomationProperties.SetName(office, "LibreOffice executable path");
         AutomationProperties.SetName(ffmpeg, "FFmpeg executable path");
         AutomationProperties.SetName(quality, "JPEG and image PDF quality, percent");
-        AutomationProperties.SetName(dpi, "Image output DPI. Pixel dimensions stay unchanged.");
+        AutomationProperties.SetName(dpi, "Image output DPI. Changes the print size.");
+        AutomationProperties.SetName(size, "Maximum image width or height. Never enlarges images.");
         var root = new Grid { Margin = new Thickness(1) };
         root.ColumnDefinitions.Add(new() { Width = new GridLength(170) }); root.ColumnDefinitions.Add(new());
         root.RowDefinitions.Add(new() { Height = new GridLength(60) }); root.RowDefinitions.Add(new()); root.RowDefinitions.Add(new() { Height = new GridLength(78) });
@@ -74,7 +84,11 @@ public sealed class SettingsWindow : Window
         feedback.VerticalAlignment = VerticalAlignment.Center; feedback.Margin = new Thickness(0, 0, 18, 0); footer.Children.Add(feedback);
         Grid.SetRow(footer, 2); Grid.SetColumnSpan(footer, 2); root.Children.Add(footer); Content = root;
         SourceInitialized += (_, _) => WindowEffects.ApplyBackdrop(this);
-        Closed += (_, _) => { if (!committed) ThemeManager.Apply(original.Theme, Application.Current.Resources); };
+        Closed += (_, _) =>
+        {
+            if (!committed)
+                ThemeManager.Apply(original.Theme, Application.Current.Resources, reducedTransparency: original.ReducedTransparency);
+        };
         Navigate(section);
     }
 
@@ -102,6 +116,12 @@ public sealed class SettingsWindow : Window
     private UIElement AppearancePage()
     {
         var content = Section("Appearance", "Choose a theme to preview it. Select Save to keep your changes.");
+        var effects = new WrapPanel { Margin = new Thickness(0, 0, 0, 12) };
+        Detach(motion);
+        Detach(transparency);
+        effects.Children.Add(motion);
+        effects.Children.Add(transparency);
+        content.Children.Add(effects);
         var tiles = new WrapPanel();
         var choices = new List<(AppTheme Theme, Button Tile, IconControl Selected)>();
         foreach (var theme in ThemeManager.Themes)
@@ -120,16 +140,14 @@ public sealed class SettingsWindow : Window
             button.Click += (_, _) =>
             {
                 selectedTheme = theme.Id;
-                ThemeManager.Apply(selectedTheme, Application.Current.Resources);
-                WindowEffects.ApplyBackdrop(this);
+                PreviewTheme();
                 RefreshSelection();
             };
             tiles.Children.Add(button);
         }
         RefreshSelection();
         content.Children.Add(tiles);
-        Detach(motion); content.Children.Add(motion);
-        content.Children.Add(Ui.Text("Glass is the default. Windows high contrast uses your system colors.", 11, "Muted"));
+        content.Children.Add(Ui.Text("Glass follows Windows transparency and contrast settings.", 11, "Muted"));
         return content;
 
         void RefreshSelection()
@@ -144,6 +162,12 @@ public sealed class SettingsWindow : Window
             }
         }
     }
+    private void PreviewTheme()
+    {
+        ThemeManager.Apply(selectedTheme, Application.Current.Resources, reducedTransparency: transparency.IsChecked == true);
+        WindowEffects.ApplyBackdrop(this);
+    }
+
     private static Border ThemeSwatch(AppTheme theme)
     {
         var rings = new Canvas { Width = 66, Height = 60, HorizontalAlignment = HorizontalAlignment.Center };
@@ -181,7 +205,8 @@ public sealed class SettingsWindow : Window
         image.Children.Add(qualityLabel); Detach(quality); image.Children.Add(quality);
         Detach(dpiLabel);
         image.Children.Add(dpiLabel); Detach(dpi); image.Children.Add(dpi);
-        image.Children.Add(Ui.Text("DPI changes print size, not pixel detail. JPEG quality is a lossy setting. Transparent images stay transparent in PNG; JPEG uses white.", 12, "Muted"));
+        Detach(sizeLabel); image.Children.Add(sizeLabel); Detach(size); image.Children.Add(size);
+        image.Children.Add(Ui.Text("Image size limits the longer edge and keeps proportions. DPI controls print size. JPEG quality controls compression.", 12, "Muted"));
         content.Children.Add(image); return content;
     }
     private UIElement WindowsPage()
@@ -202,10 +227,20 @@ public sealed class SettingsWindow : Window
     private UIElement EnginesPage()
     {
         var content = Section("Converters", "Native image, text and table conversions work immediately. Add local engines for office documents and media.");
-        content.Children.Add(EngineCard("LibreOffice", capabilities.LibreOffice is not null, "Documents, spreadsheets and presentations. Use a local installation for DOCX → PDF and other office exports.", office, "soffice.com", "https://www.libreoffice.org/download/download-libreoffice/", "soffice.exe"));
-        var second = EngineCard("FFmpeg", capabilities.Ffmpeg is not null, "Audio, video and audio extraction. Only encoders provided by your FFmpeg build are offered.", ffmpeg, "ffmpeg.exe", "https://ffmpeg.org/download.html");
+        content.Children.Add(EngineCard("LibreOffice", capabilities.LibreOffice is not null, "Layout-aware Office and PDF export. DOCX and ODT text extraction work with Konvert alone.", office, "soffice.com", "https://www.libreoffice.org/download/download-libreoffice/", "soffice.exe"));
+        var second = EngineCard("FFmpeg", capabilities.Ffmpeg is not null, "Audio, video, and WebP. Konvert checks the installed build for the needed encoders and containers.", ffmpeg, "ffmpeg.exe", "https://ffmpeg.org/download.html");
         second.Margin = new Thickness(0, 16, 0, 0); content.Children.Add(second);
-        var note = Ui.Text("Engine downloads are separate to keep Konvert small. Install an engine, then reopen the popup or choose its executable here. Conversion stays local; unsupported or lossy routes are never presented as lossless.", 11, "Muted"); note.Margin = new Thickness(0, 18, 0, 0); content.Children.Add(note); return content;
+        var codecs = new StackPanel();
+        codecs.Children.Add(Ui.Text("Windows image codecs", 16, weight: FontWeights.SemiBold));
+        var help = Ui.Text("Konvert checks whether Windows can read each WebP, HEIC, HEIF, or AVIF image. Image extensions and codec availability vary by device.", 12, "Muted");
+        help.Margin = new Thickness(0, 8, 0, 12);
+        codecs.Children.Add(help);
+        codecs.Children.Add(Ui.Button("View Windows codec guide", "link", (_, _) =>
+            OpenUrl("https://learn.microsoft.com/windows/win32/wic/native-wic-codecs")));
+        var codecCard = Ui.Card(codecs);
+        codecCard.Margin = new Thickness(0, 16, 0, 0);
+        content.Children.Add(codecCard);
+        return content;
     }
     private Border EngineCard(string name, bool ready, string description, TextBox box, string executable, string url, string? alternate = null)
     {
@@ -241,10 +276,12 @@ public sealed class SettingsWindow : Window
                 Theme = selectedTheme,
                 JpegQuality = (int)quality.Value,
                 Dpi = (int)dpi.Value,
+                MaxImageEdge = Ui.ImageSizeLimits[(int)size.Value],
                 OutputDirectory = folder.Text,
                 LibreOfficePath = string.IsNullOrWhiteSpace(office.Text) ? null : office.Text,
                 FfmpegPath = string.IsNullOrWhiteSpace(ffmpeg.Text) ? null : ffmpeg.Text,
-                ReducedMotion = motion.IsChecked == true
+                ReducedMotion = motion.IsChecked == true,
+                ReducedTransparency = transparency.IsChecked == true
             };
             if (startup.IsChecked != NativeHostIntegration.StartsWithWindows) NativeHostIntegration.SetStartup(startup.IsChecked == true);
             Settings = Settings.Validate(); committed = true; DialogResult = true;

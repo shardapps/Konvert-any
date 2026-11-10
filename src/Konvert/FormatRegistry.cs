@@ -1,6 +1,6 @@
 namespace Konvert;
 
-internal enum ConversionBackend { Image, Text, Table, Office, Media }
+internal enum ConversionBackend { Image, WindowsImage, Text, Table, Office, Media }
 
 internal sealed record ConversionRoute(
     string Extension,
@@ -9,24 +9,34 @@ internal sealed record ConversionRoute(
     string[] Sources,
     string[]? Arguments = null,
     string[]? Encoders = null,
-    bool Video = false)
+    bool Video = false,
+    string? Muxer = null,
+    string? AudioEncoder = null,
+    bool StillImage = false)
 {
+    private bool IsImage => Backend is ConversionBackend.Image or ConversionBackend.WindowsImage;
+
     public ConversionTarget Target => new(Extension, Extension.ToUpperInvariant(), Detail, Backend switch
     {
+        ConversionBackend.WindowsImage => "Windows image codec",
         ConversionBackend.Office => "LibreOffice",
         ConversionBackend.Media => "FFmpeg",
         _ => "Built in"
     })
     {
-        SupportsJpegQuality = Backend == ConversionBackend.Image && Extension is "jpg" or "pdf",
-        SupportsDpi = Backend == ConversionBackend.Image && Extension != "gif"
+        SupportsJpegQuality = IsImage && Extension is "jpg" or "pdf",
+        SupportsDpi = IsImage && Extension is not ("gif" or "ico"),
+        SupportsImageSize = (IsImage || StillImage) && Extension != "ico"
     };
 
     public bool IsAvailable(EngineCapabilities capabilities) => Backend switch
     {
         ConversionBackend.Office => capabilities.LibreOffice is not null,
+        ConversionBackend.WindowsImage => capabilities.HasWindowsImageCodec,
         ConversionBackend.Media => capabilities.Ffmpeg is not null &&
             Encoders!.All(capabilities.Encoders.Contains) &&
+            (Muxer is null || capabilities.Muxers?.Contains(Muxer) != false) &&
+            (AudioEncoder is null || capabilities.HasAudio == false || capabilities.Encoders.Contains(AudioEncoder)) &&
             (Video ? capabilities.HasVideo : capabilities.HasAudio) != false,
         _ => true
     };
@@ -35,40 +45,57 @@ internal sealed record ConversionRoute(
 public sealed class FormatRegistry(EngineCapabilities capabilities)
 {
     private static readonly string[] Images = ["png", "jpg", "bmp", "gif", "tiff", "ico", "wdp"];
+    private static readonly string[] OptionalImages = ["webp", "heic", "heif", "avif"];
     private static readonly string[] PlainText = ["txt", "md", "log", "json", "xml", "yaml", "yml", "csv", "tsv", "html", "css", "js", "cs", "py", "sql"];
     private static readonly string[] Documents = ["docx", "doc", "odt", "rtf", "txt"];
     private static readonly string[] Sheets = ["xlsx", "xls", "ods", "csv", "tsv"];
     private static readonly string[] Slides = ["pptx", "ppt", "odp"];
-    private static readonly string[] Video = ["mp4", "mkv", "mov", "webm", "avi", "wmv", "m4v", "mpeg", "mpg"];
-    private static readonly string[] Media = [.. Video, "mp3", "wav", "flac", "ogg", "m4a", "aac", "aiff", "wma", "opus"];
+    private static readonly string[] Video = ["mp4", "mkv", "mov", "webm", "avi", "wmv", "m4v", "mpeg", "mpg", "ts", "flv", "ogv", "3gp", "vob", "asf"];
+    private static readonly string[] Media = [.. Video, "mp3", "wav", "flac", "ogg", "m4a", "aac", "aiff", "wma", "opus", "caf", "mka", "ac3", "eac3", "amr"];
+    private const string EvenFrame = "pad=ceil(iw/2)*2:ceil(ih/2)*2";
+    private static readonly string[] H264 = ["-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p", "-vf", EvenFrame];
+    private static readonly (string Extension, string Detail)[] ImageExports =
+    [
+        ("png", "Lossless image · transparency"),
+        ("jpg", "JPEG image · quality control"),
+        ("pdf", "Single-page image PDF"),
+        ("tiff", "Lossless image · single frame"),
+        ("bmp", "Uncompressed image"),
+        ("gif", "256 colors · first frame"),
+        ("ico", "Windows icon · six sizes · transparency")
+    ];
     private static readonly ConversionRoute[] Routes =
     [
-        new("png", "Lossless image · transparency", ConversionBackend.Image, Images),
-        new("jpg", "JPEG image · quality control", ConversionBackend.Image, Images),
-        new("pdf", "Single-page image PDF", ConversionBackend.Image, Images),
-        new("tiff", "Lossless image · single frame", ConversionBackend.Image, Images),
-        new("bmp", "Uncompressed image", ConversionBackend.Image, Images),
-        new("gif", "256 colors · first frame", ConversionBackend.Image, Images),
+        .. ImageExports.Select(item => new ConversionRoute(item.Extension, item.Detail, ConversionBackend.Image, Images)),
+        .. ImageExports.Select(item => new ConversionRoute(item.Extension, item.Detail, ConversionBackend.WindowsImage, OptionalImages)),
+        StillRoute("webp", "Lossless WebP · first frame", "libwebp", ["png", "jpg", "bmp", "gif", "tiff", "ico"], ["-lossless", "1"]),
+        StillRoute("png", "Lossless PNG · first frame", "png", ["webp"], []),
         new("pdf", "Document export", ConversionBackend.Office, Documents),
-        new("txt", "Extract paragraph text", ConversionBackend.Text, ["docx"]),
+        new("txt", "Extract paragraph text", ConversionBackend.Text, ["docx", "odt"]),
         new("txt", "UTF-8 · preserves source text", ConversionBackend.Text, PlainText),
         new("json", "Rows as JSON objects", ConversionBackend.Table, ["csv", "tsv"]),
-        new("tsv", "Tab-separated table", ConversionBackend.Table, ["csv"]),
+        new("tsv", "Tab-separated table", ConversionBackend.Table, ["csv", "json"]),
         new("csv", "Comma-separated table", ConversionBackend.Table, ["tsv", "json"]),
         new("html", "Escaped text · readable page", ConversionBackend.Text, PlainText),
         .. Office(Documents, "Document export", ["docx", "odt", "rtf", "html", "txt"]),
         .. Office(Sheets, "Spreadsheet export", ["xlsx", "pdf", "ods", "csv"]),
         .. Office(Slides, "Presentation export", ["pdf", "pptx", "odp"]),
-        VideoRoute("mp4", ["libx264", "aac"], ["-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac"]),
-        VideoRoute("webm", ["libvpx-vp9", "libopus"], ["-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-c:a", "libopus"]),
-        VideoRoute("mkv", ["libx264", "aac"], ["-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac"]),
-        new("gif", "Animated image", ConversionBackend.Media, Video, ["-map", "0:v:0", "-an", "-vf", "fps=12,scale=640:-1:flags=lanczos", "-c:v", "gif"], ["gif"], Video: true),
-        AudioRoute("mp3", "libmp3lame", ["-q:a", "2"]),
-        AudioRoute("wav", "pcm_s16le", []),
-        AudioRoute("flac", "flac", []),
-        AudioRoute("ogg", "libvorbis", ["-q:a", "5"]),
-        AudioRoute("m4a", "aac", ["-b:a", "192k"]),
-        AudioRoute("opus", "libopus", ["-b:a", "128k"])
+        VideoRoute("mp4", "mp4", "libx264", "aac", H264),
+        VideoRoute("webm", "webm", "libvpx-vp9", "libopus", ["-crf", "32", "-b:v", "0"]),
+        VideoRoute("mkv", "matroska", "libx264", "aac", H264),
+        VideoRoute("mov", "mov", "libx264", "aac", H264),
+        VideoRoute("avi", "avi", "mpeg4", "libmp3lame", ["-q:v", "4", "-pix_fmt", "yuv420p", "-vf", EvenFrame]),
+        VideoRoute("ts", "mpegts", "libx264", "aac", H264),
+        new("gif", "Animated image", ConversionBackend.Media, Video, ["-map", "0:v:0", "-an", "-vf", "fps=12,scale=640:-1:flags=lanczos", "-c:v", "gif"], ["gif"], Video: true, Muxer: "gif"),
+        AudioRoute("mp3", "mp3", "libmp3lame", ["-q:a", "2"]),
+        AudioRoute("wav", "wav", "pcm_s16le", []),
+        AudioRoute("flac", "flac", "flac", []),
+        AudioRoute("ogg", "ogg", "libvorbis", ["-q:a", "5"]),
+        AudioRoute("m4a", "ipod", "aac", ["-b:a", "192k"]),
+        AudioRoute("opus", "opus", "libopus", ["-b:a", "128k"]),
+        AudioRoute("aac", "adts", "aac", ["-b:a", "192k"]),
+        AudioRoute("aiff", "aiff", "pcm_s16be", []),
+        AudioRoute("caf", "caf", "pcm_s16le", [])
     ];
 
     internal EngineCapabilities Capabilities => capabilities;
@@ -80,6 +107,9 @@ public sealed class FormatRegistry(EngineCapabilities capabilities)
         "jpeg" => "jpg",
         "tif" => "tiff",
         "htm" => "html",
+        "aif" or "aifc" => "aiff",
+        "jxr" or "hdp" => "wdp",
+        "m2ts" or "mts" => "ts",
         var normalized => normalized
     };
 
@@ -102,7 +132,16 @@ public sealed class FormatRegistry(EngineCapabilities capabilities)
         .Select(routes =>
         {
             var available = routes.FirstOrDefault(route => route.IsAvailable(capabilities));
-            return new ConversionOption((available ?? routes.First()).Target, available is not null);
+            var route = available ?? routes.First();
+            return new ConversionOption(route.Target, available is not null)
+            {
+                UnavailableReason = available is not null ? null : route.Backend switch
+                {
+                    ConversionBackend.WindowsImage => "Windows could not read this image. Check the installed image extensions or verify the file.",
+                    ConversionBackend.Media when capabilities.Ffmpeg is not null => "This FFmpeg build is missing a required encoder or container.",
+                    _ => $"Set up {route.Target.Engine} in Preferences."
+                }
+            };
         })
         .ToArray();
 
@@ -114,11 +153,17 @@ public sealed class FormatRegistry(EngineCapabilities capabilities)
     private static IEnumerable<ConversionRoute> Office(string[] sources, string detail, string[] extensions) =>
         extensions.Select(extension => new ConversionRoute(extension, detail, ConversionBackend.Office, sources));
 
-    private static ConversionRoute AudioRoute(string extension, string encoder, string[] options) =>
+    private static ConversionRoute AudioRoute(string extension, string muxer, string encoder, string[] options) =>
         new(extension, "First audio track", ConversionBackend.Media, Media,
-            ["-map", "0:a:0", "-vn", "-c:a", encoder, .. options], [encoder]);
+            ["-map", "0:a:0", "-vn", "-c:a", encoder, .. options], [encoder], Muxer: muxer);
 
-    private static ConversionRoute VideoRoute(string extension, string[] encoders, string[] options) =>
+    private static ConversionRoute VideoRoute(string extension, string muxer, string videoEncoder, string audioEncoder, string[] options) =>
         new(extension, "Video with optional audio", ConversionBackend.Media, Video,
-            ["-map", "0:v:0", "-map", "0:a:0?", .. options], encoders, Video: true);
+            ["-map", "0:v:0", "-map", "0:a:0?", "-c:v", videoEncoder, .. options], [videoEncoder],
+            Video: true, Muxer: muxer, AudioEncoder: audioEncoder);
+
+    private static ConversionRoute StillRoute(string extension, string detail, string encoder, string[] sources, string[] options) =>
+        new(extension, detail, ConversionBackend.Media, sources,
+            ["-map", "0:v:0", "-frames:v", "1", "-an", "-c:v", encoder, "-update", "1", .. options], [encoder],
+            Video: true, Muxer: "image2", StillImage: true);
 }

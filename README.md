@@ -15,9 +15,9 @@
 
 </div>
 
-Konvert is a free, open source **Windows file converter** by **Shardapps**. Select one file in Explorer or on the desktop and press **Ctrl+K**. A 224 DIP circle opens below the selection when there’s room, with up to three labelled formats. Pick one to save beside the original at standard quality. Open **Options** for the full format list, a folder picker, JPEG quality, and image DPI.
+Konvert is a free, open source **Windows file converter** by **Shardapps**. Select one file in Explorer or on the desktop and press **Ctrl+K**. A 224 DIP circle opens below the selection when there’s room, with up to three labelled formats. Pick one to save beside the original at standard quality. Open **Options** for the full format list, a folder picker, image size, JPEG quality, and DPI.
 
-**0.3.2 alpha** refreshes Glass, places the popup near the selected file, and shows the destination format and engine during conversion. Click outside to dismiss it. An active export keeps running in the background. Compact **x64 and ARM64 setup EXEs** use the shared Microsoft .NET 10 Desktop Runtime.
+**0.3.3 alpha** adds a clearer Glass lens, an image size control, and more image, document, table, and media formats. The first-launch picker and file popup both dismiss on an outside click. Active exports finish in the background. Compact **x64 and ARM64 setup EXEs** use the shared Microsoft .NET 10 Desktop Runtime.
 
 ## Stay in your flow
 
@@ -29,26 +29,30 @@ The small native listener registers Ctrl+K **only while Explorer or the desktop 
 
 ## A quieter surface
 
-**Glass** is the default: translucent floating controls, subtle edge highlights and short transitions. Six additional themes are **Pearl, Graphite, Midnight, Ocean, Lavender and Forest**. Settings includes live previews, original vector icons, custom sliders and switches, output controls, converter setup and Windows integration.
+**Glass** is the default. The desktop shows through an icy blue lens with a lit rim. Solid controls keep format labels readable. Six additional themes are **Pearl, Graphite, Midnight, Ocean, Lavender and Forest**. Settings includes live previews and controls for reducing transparency or motion.
 
-The design takes principles from Apple's floating material layers and Material's color/motion hierarchy, with Shardapps' small utility interaction as the product reference. It is an original Windows implementation, not Apple's Liquid Glass renderer. [Design decisions and references](docs/DESIGN.md).
+The design draws on Apple’s floating material layers, Google’s control hierarchy, and Shardapps’ compact utilities. [Design decisions and references](docs/DESIGN.md).
+
+![Konvert’s first-launch picker, quick conversion ring, and expanded image options rendered over a generated background](docs/assets/clear-glass-picker.png)
 
 ## Conversions that tell you what they need
 
 | Family | Examples | Engine |
 | --- | --- | --- |
-| Images | PNG ↔ JPG/BMP/TIFF/GIF; image → PDF | Native Windows codecs |
+| Images | PNG ↔ JPG/BMP/TIFF/GIF; image → ICO or PDF | Built in |
+| Modern images | HEIC/HEIF/AVIF/WebP input; PNG/JPG and more | Available Windows image codecs |
+| WebP | PNG/JPG and other still images → lossless WebP; WebP → PNG | Local FFmpeg |
 | Text | Raw text → UTF-8 TXT or escaped HTML text page | Built in |
-| Tables | CSV ↔ TSV; CSV/TSV → JSON; flat JSON → CSV | Built in |
-| Document text | DOCX → TXT | Built in |
+| Tables | CSV ↔ TSV; CSV/TSV → JSON; flat JSON → CSV or TSV | Built in |
+| Document text | DOCX/ODT → TXT | Built in |
 | Documents | DOCX, DOC, ODT, RTF → PDF and office formats | Local LibreOffice |
 | Spreadsheets | XLSX, XLS, ODS, CSV/TSV → PDF and spreadsheet formats | Local LibreOffice |
 | Presentations | PPTX, PPT, ODP → PDF and presentation formats | Local LibreOffice |
-| Audio/video | MP4 → MP3, WAV → FLAC, video → MP4/WebM/GIF and more | Local FFmpeg |
+| Audio/video | Video → MOV/AVI/MP4/WebM/MKV/TS/GIF; audio → AAC/AIFF/CAF/MP3 and more | Local FFmpeg |
 
-Native routes work immediately. Office and media engines are separate installations. The expanded menu links unavailable routes to converter setup. For media, Konvert checks FFmpeg encoders and uses FFprobe when present to detect which streams are available.
+Native routes work without LibreOffice or FFmpeg. LibreOffice is optional for layout-aware Office exports such as DOCX → PDF. Konvert probes the Windows decoder for modern images and checks FFmpeg encoders and containers before offering media exports. It uses FFprobe when present to inspect the source tracks.
 
-Formats are not interchangeable without consequences. Lossy codecs, office layout/fonts, first-frame image exports and flat-table restrictions are documented in the [exact format matrix](docs/FORMATS.md). PDF input/OCR, WebP/HEIC exports and batches are not implemented yet. No “anything to anything without loss” claim is made.
+The format matrix documents loss from re-encoding, Office layout differences, first-frame image exports, and flat-table restrictions. [Format matrix](docs/FORMATS.md).
 
 ## Install
 
