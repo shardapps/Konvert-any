@@ -16,7 +16,11 @@ internal sealed record ConversionRoute(
         ConversionBackend.Office => "LibreOffice",
         ConversionBackend.Media => "FFmpeg",
         _ => "Built in"
-    });
+    })
+    {
+        SupportsJpegQuality = Backend == ConversionBackend.Image && Extension is "jpg" or "pdf",
+        SupportsDpi = Backend == ConversionBackend.Image && Extension != "gif"
+    };
 
     public bool IsAvailable(EngineCapabilities capabilities) => Backend switch
     {

@@ -2,7 +2,11 @@ global using System.IO;
 
 namespace Konvert;
 
-public sealed record ConversionTarget(string Extension, string Label, string Detail, string Engine);
+public sealed record ConversionTarget(string Extension, string Label, string Detail, string Engine)
+{
+    public bool SupportsJpegQuality { get; init; }
+    public bool SupportsDpi { get; init; }
+}
 public sealed record ConversionOption(ConversionTarget Target, bool Available);
 
 public sealed record ConversionSettings
