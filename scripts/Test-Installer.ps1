@@ -15,10 +15,17 @@ $commandKey = 'HKCU:\Software\Classes\*\shell\Shardapps.Konvert\command'
 $trackingKey = 'HKCU:\Software\Shardapps\Konvert'
 $settingsFile = Join-Path $env:LOCALAPPDATA 'Shardapps/Konvert/settings.json'
 $noTasks = '!integration,!startup,!desktopicon'
+
+function Read-RegistryValue([string]$Key, [string]$Name) {
+    if (!(Test-Path -LiteralPath $Key)) { return $null }
+    $entry = Get-Item -LiteralPath $Key
+    try { return $entry.GetValue($Name) }
+    finally { $entry.Dispose() }
+}
+
 if ((Test-Path -LiteralPath $registeredKey) -or (Test-Path -LiteralPath $commandKey) -or
     (Test-Path -LiteralPath $settingsFile) -or (Get-Process KonvertHost,Konvert -ErrorAction SilentlyContinue) -or
-    (Get-ItemPropertyValue -LiteralPath $runKey -Name 'Shardapps.Konvert' -ErrorAction SilentlyContinue) -or
-    (Get-ItemPropertyValue -LiteralPath $trackingKey -Name 'OwnedPath' -ErrorAction SilentlyContinue)) {
+    (Read-RegistryValue $runKey 'Shardapps.Konvert') -or (Read-RegistryValue $trackingKey 'OwnedPath')) {
     throw 'Run installer lifecycle tests on a clean disposable Windows account.'
 }
 $originalPath = [string][Environment]::GetEnvironmentVariable('PATH', 'User')
@@ -94,8 +101,7 @@ function Test-NoIntegration {
     if ([string][Environment]::GetEnvironmentVariable('PATH', 'User') -ne $originalPath) {
         throw 'A disabled or removed installation left PATH changes.'
     }
-    if ((Test-Path -LiteralPath $commandKey) -or
-        (Get-ItemPropertyValue -LiteralPath $runKey -Name 'Shardapps.Konvert' -ErrorAction SilentlyContinue)) {
+    if ((Test-Path -LiteralPath $commandKey) -or (Read-RegistryValue $runKey 'Shardapps.Konvert')) {
         throw 'A disabled or removed installation left Explorer or startup registration.'
     }
 }
@@ -154,13 +160,13 @@ try {
     if (!$legacyHost.HasExited) { throw 'The legacy listener was not stopped.' }
     $null = Test-CompactInstall $registered
     $expectedCommand = '"' + (Join-Path $registered 'Konvert.App/Konvert.exe') + '" --popup "%1"'
-    if ((Get-Item -LiteralPath $commandKey).GetValue('') -ne $expectedCommand) {
+    if ((Read-RegistryValue $commandKey '') -ne $expectedCommand) {
         throw 'Explorer still points to the legacy executable.'
     }
-    if ((Get-ItemPropertyValue -LiteralPath $trackingKey -Name 'OwnedPath') -ne (Join-Path $registered 'Konvert.App')) {
+    if ((Read-RegistryValue $trackingKey 'OwnedPath') -ne (Join-Path $registered 'Konvert.App')) {
         throw 'PATH did not move to the compact executable.'
     }
-    if (Get-ItemPropertyValue -LiteralPath $runKey -Name 'Shardapps.Konvert' -ErrorAction SilentlyContinue) {
+    if (Read-RegistryValue $runKey 'Shardapps.Konvert') {
         throw 'Setup re-enabled a previously disabled startup option.'
     }
     if ((Test-Path -LiteralPath (Join-Path $registered 'LICENSE')) -or
