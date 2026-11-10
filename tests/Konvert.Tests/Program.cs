@@ -78,8 +78,12 @@ internal static class Program
         });
         await Test("Resolved routes honor aliases and actual media streams", () =>
         {
-            var registry = new FormatRegistry(new(null, "ffmpeg.exe", new HashSet<string> { "libx264", "aac", "libmp3lame" })
-                { HasAudio = false, HasVideo = true });
+            var capabilities = new EngineCapabilities(null, "ffmpeg.exe", new HashSet<string> { "libx264", "aac", "libmp3lame" })
+            {
+                HasAudio = false,
+                HasVideo = true
+            };
+            var registry = new FormatRegistry(capabilities);
             True(registry.GetTargets("clip.avi").Any(target => target.Extension == "mp4"));
             True(!registry.GetOptions("clip.avi").Any(option => option.Target.Extension == "mp3"));
             True(registry.Resolve("clip.avi", "mp3") is null);
