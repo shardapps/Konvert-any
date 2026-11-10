@@ -36,21 +36,27 @@ public partial class App : Application
             return;
         }
         string? input = null;
-        double? x = null, y = null;
+        double? x = null, y = null, top = null;
         for (var i = 0; i < e.Args.Length; i++)
         {
-            if (e.Args[i] is "--anchor-x" or "--anchor-y" && i + 1 < e.Args.Length)
+            if (e.Args[i] is "--anchor-x" or "--anchor-y" or "--anchor-top" && i + 1 < e.Args.Length)
             {
                 if (double.TryParse(e.Args[++i], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var coordinate) && double.IsFinite(coordinate))
                 {
-                    if (e.Args[i - 1] == "--anchor-x") x = coordinate; else y = coordinate;
+                    switch (e.Args[i - 1])
+                    {
+                        case "--anchor-x": x = coordinate; break;
+                        case "--anchor-y": y = coordinate; break;
+                        case "--anchor-top": top = coordinate; break;
+                    }
                 }
             }
             else if (!e.Args[i].StartsWith("--", StringComparison.Ordinal)) input = e.Args[i];
         }
         ThemeManager.Apply(new SettingsStore().Load().Theme, Resources);
         uiMutex = new Mutex(false, "Local\\Shardapps.Konvert.UI");
-        var window = new MainWindow(input, x.HasValue && y.HasValue ? new(x.Value, y.Value) : null, e.Args.Contains("--settings"));
+        var window = new MainWindow(input, x.HasValue && y.HasValue ? new(x.Value, y.Value, top) : null,
+            e.Args.Contains("--settings"), reportToHost: e.Args.Contains("--shortcut"));
         MainWindow = window;
         window.Show();
     }

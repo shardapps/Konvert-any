@@ -1,13 +1,13 @@
 # Konvert project facts
 
-Updated 2026-11-10 for 0.3.1-alpha.1. [shardapps/Konvert-any](https://github.com/shardapps/Konvert-any).
+Updated 2026-11-10 for 0.3.2-alpha.1. [shardapps/Konvert-any](https://github.com/shardapps/Konvert-any).
 
 | Field | Fact |
 | --- | --- |
 | Product | Konvert, by Shardapps |
 | Category | Local Windows file converter |
 | Platform | Windows 11; x64 and native ARM64 builds; physical ARM64 verification pending |
-| Interaction | Ctrl+K on one selected file opens a 224 DIP circle. A chevron reveals extra formats and per-conversion settings. |
+| Interaction | Ctrl+K on one selected file opens a 224 DIP circle below the selection when space permits. **Options** reveals extra formats and settings. Clicking away dismisses the popup and allows an active conversion to finish. |
 | Persistent component | Small C++20 event-driven shortcut listener with tray pause/quit |
 | Transient component | .NET 10/WPF conversion UI; no embedded browser |
 | Themes | Glass default; Pearl, Graphite, Midnight, Ocean, Lavender, Forest |

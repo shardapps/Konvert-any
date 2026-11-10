@@ -19,6 +19,9 @@ public partial class MainWindow : Window
     private const int QuickSlots = 3;
     private readonly SettingsStore store = new();
     private readonly CancellationTokenSource lifetime = new();
+    private readonly bool filePopup;
+    private readonly bool reportToHost;
+    private readonly DispatcherTimer progress = new() { Interval = TimeSpan.FromSeconds(1) };
     private PopupAnchor? anchor;
     private readonly Canvas ring = new() { Width = RingSize, Height = RingSize };
     private readonly StackPanel drawer = new();
@@ -29,6 +32,8 @@ public partial class MainWindow : Window
     private readonly Button center;
     private readonly Button expand;
     private readonly IconControl expandIcon;
+    private readonly IconControl centerIcon;
+    private readonly TextBlock expandLabel;
     private readonly TextBlock sourceLabel;
     private readonly TextBlock hint;
     private readonly TextBlock details;
@@ -47,22 +52,28 @@ public partial class MainWindow : Window
     private IReadOnlyList<ConversionOption> options = [];
     private Task? discovery;
     private CancellationTokenSource? conversion;
+    private OutsideClicks? outsideClicks;
+    private ConversionTarget? activeTarget;
+    private Stopwatch? jobTime;
     private string? input;
     private string? result;
     private string? error;
-    private bool busy, modal, closing, closeAfterCancel, activated, discovering, refreshAfterJob;
+    private bool busy, modal, closing, closeAfterCancel, dismissed, discovering, refreshAfterJob;
 
-    public MainWindow(string? initialFile = null, PopupAnchor? anchor = null, bool showSettings = false, ConversionSettings? preferences = null)
+    public MainWindow(string? initialFile = null, PopupAnchor? anchor = null, bool showSettings = false,
+        ConversionSettings? preferences = null, bool reportToHost = false)
     {
         InitializeComponent();
         this.anchor = anchor;
+        filePopup = initialFile is not null;
+        this.reportToHost = reportToHost;
         this.preferences = preferences ?? store.Load();
         jobSettings = this.preferences;
         Width = Height = RingSize;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
-        ShowInTaskbar = true;
-        Topmost = true;
+        ShowInTaskbar = !filePopup;
+        Topmost = filePopup;
         WindowStartupLocation = WindowStartupLocation.Manual;
         UseLayoutRounding = true;
         SnapsToDevicePixels = true;
@@ -84,7 +95,8 @@ public partial class MainWindow : Window
         shortcutHint = RingCaption("Explorer   Ctrl + K", 160);
 
         var centerContent = new StackPanel();
-        centerContent.Children.Add(Ui.Icon("convert", 22, "Accent"));
+        centerIcon = Ui.Icon("convert", 21, "Accent");
+        centerContent.Children.Add(centerIcon);
         sourceLabel = Ui.Text("Konvert", 14, weight: FontWeights.SemiBold);
         sourceLabel.TextAlignment = TextAlignment.Center;
         sourceLabel.TextTrimming = TextTrimming.CharacterEllipsis;
@@ -95,6 +107,7 @@ public partial class MainWindow : Window
         hint.TextAlignment = TextAlignment.Center;
         centerContent.Children.Add(hint);
         center = RoundButton(centerContent, 80, "Choose a file");
+        center.SetResourceReference(Control.BackgroundProperty, "CoreFill");
         center.TabIndex = QuickSlots + 1;
         center.Click += (_, _) =>
         {
@@ -105,11 +118,17 @@ public partial class MainWindow : Window
         };
         Place(center, 112, 112, 80, 80);
 
-        expandIcon = Ui.Icon("down", 17);
-        expand = RoundButton(expandIcon, 36, "More formats and options");
+        expandIcon = Ui.Icon("down", 13, "Muted");
+        expandLabel = Ui.Text("Options", 11, "Ink", FontWeights.SemiBold);
+        expandLabel.Margin = new Thickness(5, 0, 0, 0);
+        var disclosure = new StackPanel { Orientation = Orientation.Horizontal };
+        disclosure.Children.Add(expandIcon);
+        disclosure.Children.Add(expandLabel);
+        expand = new Button { Content = disclosure, Width = 82, Height = 31, Padding = new Thickness(5, 3, 5, 3) };
+        AutomationProperties.SetName(expand, "More formats and options");
         expand.TabIndex = QuickSlots;
         expand.Click += (_, _) => ToggleDrawer();
-        Place(expand, 112, 187, 36, 36);
+        Place(expand, 112, 185, 82, 31);
 
         status = Ui.Text("", 12);
         status.TextWrapping = TextWrapping.Wrap;
@@ -154,12 +173,12 @@ public partial class MainWindow : Window
         Title = initialFile is null ? "Konvert" : "Konvert · " + Path.GetFileName(initialFile);
         if (initialFile is not null) SetSource(initialFile);
         else UpdatePresentation();
-        Activated += (_, _) => activated = true;
         Deactivated += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
         {
-            if (input is not null && activated && !IsActive && !closing && !busy && !modal)
-                Close();
+            if (!IsActive) DismissPopup();
         });
+        IsVisibleChanged += (_, _) => WatchVisibility();
+        progress.Tick += (_, _) => UpdatePresentation();
         PreviewKeyDown += (_, e) =>
         {
             if (e.Key != Key.Escape) return;
@@ -183,6 +202,16 @@ public partial class MainWindow : Window
         {
             anchor = WindowEffects.PlacePopup(this, anchor, RingSize);
             Activate();
+            WatchVisibility();
+            if (filePopup && Animate)
+            {
+                var offset = new TranslateTransform();
+                Root.RenderTransform = offset;
+                offset.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-5, 0, TimeSpan.FromMilliseconds(145))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                });
+            }
             if (IsActive) (quickButtons.FirstOrDefault() ?? (input is null ? center : expand)).Focus();
             if (initialFile is null && File.Exists(NativeHostIntegration.HostPath))
             {
@@ -194,6 +223,34 @@ public partial class MainWindow : Window
         };
     }
 
+    private bool Animate => !preferences.ReducedMotion && !SystemParameters.HighContrast && SystemParameters.ClientAreaAnimation;
+
+    private void WatchVisibility()
+    {
+        if (!filePopup || !IsLoaded || !IsVisible)
+        {
+            outsideClicks?.Dispose();
+            outsideClicks = null;
+            progress.Stop();
+            return;
+        }
+        outsideClicks ??= new OutsideClicks(this, DismissPopup);
+        if (busy) progress.Start();
+    }
+
+    internal void DismissPopup()
+    {
+        if (!filePopup || closing || modal || dismissed) return;
+        if (!busy)
+        {
+            Close();
+            return;
+        }
+        dismissed = true;
+        Hide();
+        if (reportToHost) NativeHostIntegration.PopupWasDismissed();
+    }
+
     private void SetSource(string path)
     {
         if (!File.Exists(path))
@@ -202,8 +259,6 @@ public partial class MainWindow : Window
             return;
         }
         input = Path.GetFullPath(path);
-        sourceLabel.Text = Path.GetExtension(input).TrimStart('.').ToUpperInvariant();
-        if (sourceLabel.Text.Length == 0) sourceLabel.Text = "FILE";
         dropHint.Visibility = shortcutHint.Visibility = Visibility.Collapsed;
         center.ToolTip = Path.GetFileName(input);
         AutomationProperties.SetName(center, Path.GetFileName(input));
@@ -248,10 +303,16 @@ public partial class MainWindow : Window
         for (var index = 0; index < Math.Min(ready.Length, QuickSlots); index++)
         {
             var target = ready[index].Target;
-            var label = Ui.Text(target.Label, 13, "Accent", FontWeights.SemiBold);
+            var title = Ui.Text(target.Label, 13, "Ink", FontWeights.SemiBold);
+            title.TextAlignment = TextAlignment.Center;
+            var category = Ui.Text(Ui.FormatCategory(target.Extension), 9, "Muted");
+            category.TextAlignment = TextAlignment.Center;
+            var label = new StackPanel();
+            label.Children.Add(title);
+            label.Children.Add(category);
             var button = RoundButton(label, 55, "Convert to " + target.Label);
             button.TabIndex = index;
-            button.ToolTip = target.Detail;
+            button.ToolTip = $"{Ui.FormatName(target.Extension)} · {target.Engine}\n{target.Detail}";
             button.Click += async (_, _) => await ConvertAsync(target,
                 drawerCard.Visibility == Visibility.Visible ? jobSettings : new ConversionSettings());
             Place(button, slots[index].X, slots[index].Y, 55, 55);
@@ -276,7 +337,9 @@ public partial class MainWindow : Window
                 Height = 34,
                 Padding = new Thickness(2),
                 Margin = new Thickness(0, 0, 4, 4),
-                ToolTip = option.Available ? target.Detail : "Set up " + target.Engine
+                ToolTip = option.Available
+                    ? $"{Ui.FormatName(target.Extension)} · {target.Engine}\n{target.Detail}"
+                    : $"{Ui.FormatName(target.Extension)} needs {target.Engine}. Open converter settings."
             };
             AutomationProperties.SetName(button, option.Available ? "Convert to " + target.Label + " with options" : "Set up " + target.Label + " with " + target.Engine);
             button.Click += async (_, _) =>
@@ -305,10 +368,15 @@ public partial class MainWindow : Window
         if (open) RenderExtraFormats();
         else extraFormats.Children.Clear();
         expandIcon.Kind = open ? "up" : "down";
+        expandLabel.Text = open ? "Less" : "Options";
         AutomationProperties.SetName(expand, open ? "Hide options" : "More formats and options");
         FitToContent();
-        if (open && IsLoaded && !preferences.ReducedMotion && !SystemParameters.HighContrast && SystemParameters.ClientAreaAnimation)
-            drawerCard.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120)) { FillBehavior = FillBehavior.Stop });
+        if (open && IsLoaded && Animate)
+            drawerCard.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(140))
+            {
+                FillBehavior = FillBehavior.Stop,
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            });
     }
 
     private void UpdateDetails()
@@ -350,8 +418,11 @@ public partial class MainWindow : Window
         result = null;
         using var job = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
         conversion = job;
+        activeTarget = target;
+        jobTime = Stopwatch.StartNew();
         busy = true;
         SetControlsEnabled(false);
+        if (IsVisible) progress.Start();
         UpdatePresentation();
         string? saved = null;
         try
@@ -367,8 +438,15 @@ public partial class MainWindow : Window
         {
             busy = false;
             conversion = null;
+            activeTarget = null;
+            progress.Stop();
             SetControlsEnabled(true);
-            if (closeAfterCancel) Close();
+            if (dismissed)
+            {
+                if (reportToHost && !job.IsCancellationRequested) NativeHostIntegration.ReportBackgroundResult(saved is not null);
+                Close();
+            }
+            else if (closeAfterCancel) Close();
             else if (refreshAfterJob)
             {
                 refreshAfterJob = false;
@@ -378,7 +456,7 @@ public partial class MainWindow : Window
         }
         if (saved is not null && !closing && drawerCard.Visibility != Visibility.Visible)
         {
-            try { await Task.Delay(1100, lifetime.Token); }
+            try { await Task.Delay(1800, lifetime.Token); }
             catch (OperationCanceledException) { return; }
             if (!closing && !busy && result == saved && drawerCard.Visibility != Visibility.Visible) Close();
         }
@@ -401,9 +479,14 @@ public partial class MainWindow : Window
     {
         var ready = options.Any(option => option.Available);
         var noExports = input is not null && !ready && !discovering;
-        hint.Text = busy ? "Stop" : result is not null ? "Saved" : input is null ? "Choose file" :
+        var extension = Path.GetExtension(input)?.TrimStart('.') ?? "";
+        sourceLabel.Text = busy && activeTarget is not null ? "To " + activeTarget.Label :
+            result is not null ? Path.GetExtension(result).TrimStart('.').ToUpperInvariant() :
+            input is null ? "Konvert" : extension.Length == 0 ? "FILE" : extension.ToUpperInvariant();
+        centerIcon.Kind = result is not null ? "check" : "convert";
+        hint.Text = busy ? "Cancel" : result is not null ? "Show file" : input is null ? "Choose file" :
             discovering && !ready ? "Checking…" : noExports ? (options.Count == 0 ? "Choose file" : "Set up") :
-            error is not null ? "Try again" : "Convert to";
+            error is not null ? "Try again" : "Source file";
         center.IsTabStop = busy || result is not null || input is null || noExports;
         center.ToolTip = busy ? "Cancel conversion (Esc)" : result ?? (input is null ? "Choose a file" : Path.GetFileName(input));
         var action = busy ? "Cancel conversion" : result is not null ? "Show converted file" :
@@ -411,9 +494,11 @@ public partial class MainWindow : Window
             noExports ? "Open converter setup options" : Path.GetFileName(input);
         AutomationProperties.SetName(center, action);
 
-        var message = error ?? (noExports
-            ? options.Count == 0 ? "There’s no export for this file. Choose another file." : "Open the arrow to set up a converter."
-            : "");
+        var message = busy && activeTarget is not null && jobTime is not null
+            ? $"Converting to {activeTarget.Label} · {activeTarget.Engine}\n{(int)jobTime.Elapsed.TotalSeconds}s elapsed"
+            : error ?? (result is not null ? $"Saved {Path.GetFileName(result)}" : noExports
+                ? options.Count == 0 ? "There’s no export for this file. Choose another file." : "Open Options to set up a converter."
+                : "");
         if (message.Length > 360) message = message[..357] + "…";
         status.Text = message;
         status.ToolTip = message;
@@ -430,7 +515,7 @@ public partial class MainWindow : Window
         var height = RingSize + statusCard.DesiredSize.Height + drawerCard.DesiredSize.Height;
         if (Math.Abs(Height - height) < 0.5) return;
         Height = height;
-        if (IsLoaded) WindowEffects.PlacePopup(this, anchor, RingSize);
+        if (IsLoaded && IsVisible) WindowEffects.PlacePopup(this, anchor, RingSize);
     }
 
     private void ChooseFolder()
@@ -464,7 +549,7 @@ public partial class MainWindow : Window
 
     private void OpenFile(string path)
     {
-        var next = new MainWindow(path, preferences: preferences);
+        var next = new MainWindow(path, preferences: preferences, reportToHost: reportToHost);
         next.Show();
         Close();
     }
@@ -533,6 +618,9 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        progress.Stop();
+        outsideClicks?.Dispose();
+        outsideClicks = null;
         lifetime.Cancel();
         lifetime.Dispose();
         base.OnClosed(e);

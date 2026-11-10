@@ -6,7 +6,7 @@ Konvert targets Windows 11. Choose x64 for Intel/AMD or ARM64 for Windows on Arm
 
 Run the matching setup from Releases or CI. The default per-user directory is **%LOCALAPPDATA%\\Programs\\Shardapps\\Konvert**, following Screen's Shardapps folder convention. Setup creates a Start menu shortcut, registers uninstall in Windows Settings → Apps, and offers Explorer/PATH integration, startup at sign-in and a desktop shortcut.
 
-With Explorer integration or sign-in startup enabled, setup starts the native listener. Select one file in Explorer or on the desktop and press Ctrl+K. Pick a format to save next to the source. Open the chevron for more formats and output settings. Escape collapses the drawer or closes the circle. An outside click dismisses an idle popup.
+With Explorer integration or sign-in startup enabled, setup starts the native listener. Select one file in Explorer or on the desktop and press Ctrl+K. The circle appears below the file when there’s room. Pick a format to save beside the source, or open **Options** for more formats and output settings. Escape closes Options, dismisses the circle, or cancels an active export. An outside click hides the popup and lets an active export finish.
 
 Windows 11 shows the installer/portable Explorer command under **Show more options**. A modern packaged Explorer extension remains future work. Open a new terminal after PATH changes. The installer prepends its own directory, preserving unrelated PATH entries and removing only a previous entry Konvert recorded owning.
 
@@ -18,7 +18,7 @@ After installation, Setup removes exact matches for files shipped with the previ
 
 Native images, text, tables and DOCX text work without additional engines. For DOCX-to-PDF and other office exports, install [LibreOffice](https://www.libreoffice.org/download/download-libreoffice/). For audio/video, use a trusted [FFmpeg build](https://ffmpeg.org/download.html).
 
-Settings → Converters shows availability, download links and executable path pickers. Missing-engine popup options open that page. Set an explicit path to soffice.exe or ffmpeg.exe, save, then reopen the popup. Program Files and absolute PATH directories are also detected. The engines are not included in setup and have separate licenses.
+**Settings → Converters** shows availability, download links, and executable path pickers. Missing-engine options open that page. Select a local `soffice.com`, `soffice.exe`, or `ffmpeg.exe`, save, then reopen the popup. Konvert also detects engines in Program Files and absolute PATH directories. Optional engines are installed and licensed separately.
 
 ## Portable ZIP
 

@@ -1,21 +1,37 @@
 <Application x:Class="Konvert.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Application.Resources>
-    <SolidColorBrush x:Key="Chrome" Color="#E61C2835"/><SolidColorBrush x:Key="Surface" Color="#DC263747"/>
-    <SolidColorBrush x:Key="Raised" Color="#E0384B60"/><SolidColorBrush x:Key="Ink" Color="#F5F9FF"/>
-    <SolidColorBrush x:Key="Muted" Color="#C0CCD9"/><SolidColorBrush x:Key="Accent" Color="#A9E8FA"/>
-    <SolidColorBrush x:Key="Outline" Color="#7DDBECF6"/>
-    <LinearGradientBrush x:Key="GlassHighlight" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#28FFFFFF"/><GradientStop Color="#00FFFFFF" Offset="1"/></LinearGradientBrush>
-    <Style TargetType="Window"><Setter Property="FontFamily" Value="Segoe UI Variable Display, Segoe UI"/><Setter Property="FontSize" Value="14"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="Background" Value="{DynamicResource Chrome}"/></Style>
+    <SolidColorBrush x:Key="Chrome" Color="#F214202C"/><SolidColorBrush x:Key="Surface" Color="#FC1C2B39"/>
+    <SolidColorBrush x:Key="Raised" Color="#293D4E"/><SolidColorBrush x:Key="Ink" Color="#F4F9FD"/>
+    <SolidColorBrush x:Key="Muted" Color="#C1D5E5"/><SolidColorBrush x:Key="Accent" Color="#A9E8FA"/>
+    <SolidColorBrush x:Key="Outline" Color="#577084"/>
+    <SolidColorBrush x:Key="CoreFill" Color="#FC1C2B39"/>
+    <SolidColorBrush x:Key="StateTint" Color="#28A9E8FA"/>
+    <SolidColorBrush x:Key="TooltipFill" Color="#1C2B39"/>
+    <SolidColorBrush x:Key="OnAccent" Color="#101820"/>
+    <LinearGradientBrush x:Key="GlassHighlight" StartPoint="0,0" EndPoint="0.25,0.82"><GradientStop Color="#1DFFFFFF"/><GradientStop Color="#00FFFFFF" Offset="1"/></LinearGradientBrush>
+    <Style TargetType="Window"><Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI"/><Setter Property="FontSize" Value="14"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="Background" Value="{DynamicResource Chrome}"/></Style>
     <Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Ink}"/></Style>
+    <Style TargetType="ToolTip">
+      <Setter Property="Background" Value="{DynamicResource TooltipFill}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="MaxWidth" Value="315"/>
+      <Setter Property="Padding" Value="11,8"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToolTip">
+        <Border Background="{TemplateBinding Background}" BorderBrush="{DynamicResource Outline}" BorderThickness="1" CornerRadius="9" Padding="{TemplateBinding Padding}">
+          <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}" Foreground="{TemplateBinding Foreground}" TextWrapping="Wrap"/>
+        </Border>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
     <Style TargetType="Button">
       <Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="Background" Value="{DynamicResource Raised}"/><Setter Property="BorderBrush" Value="{DynamicResource Outline}"/>
-      <Setter Property="BorderThickness" Value="1"/><Setter Property="Padding" Value="14,10"/><Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="BorderThickness" Value="1"/><Setter Property="Padding" Value="14,10"/><Setter Property="Cursor" Value="Hand"/><Setter Property="HorizontalContentAlignment" Value="Center"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
         <Border x:Name="Frame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="16">
-          <Grid><Border Background="{DynamicResource GlassHighlight}" CornerRadius="15" IsHitTestVisible="False"/><ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid>
+          <Grid><Border x:Name="Tint" Background="{DynamicResource StateTint}" CornerRadius="15" IsHitTestVisible="False" Opacity="0"/><ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/></Grid>
         </Border>
         <ControlTemplate.Triggers>
-          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource Accent}"/></Trigger>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource Accent}"/><Setter TargetName="Tint" Property="Opacity" Value="1"/></Trigger>
           <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource Accent}"/><Setter TargetName="Frame" Property="BorderThickness" Value="2"/></Trigger>
           <Trigger Property="IsPressed" Value="True"><Setter TargetName="Frame" Property="Opacity" Value="0.75"/></Trigger>
           <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Frame" Property="Opacity" Value="0.45"/></Trigger>
@@ -26,11 +42,11 @@
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
         <Grid>
           <Ellipse x:Name="Disc" Fill="{TemplateBinding Background}" Stroke="{TemplateBinding BorderBrush}" StrokeThickness="1"/>
-          <Ellipse Margin="1" Fill="{DynamicResource GlassHighlight}" IsHitTestVisible="False"/>
+          <Ellipse x:Name="Tint" Margin="1" Fill="{DynamicResource StateTint}" IsHitTestVisible="False" Opacity="0"/>
           <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Grid>
         <ControlTemplate.Triggers>
-          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Disc" Property="Stroke" Value="{DynamicResource Accent}"/><Setter TargetName="Disc" Property="StrokeThickness" Value="2"/></Trigger>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Disc" Property="Stroke" Value="{DynamicResource Accent}"/><Setter TargetName="Tint" Property="Opacity" Value="1"/></Trigger>
           <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Disc" Property="Stroke" Value="{DynamicResource Accent}"/><Setter TargetName="Disc" Property="StrokeThickness" Value="2"/></Trigger>
           <Trigger Property="IsPressed" Value="True"><Setter TargetName="Disc" Property="Opacity" Value="0.7"/></Trigger>
           <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.48"/></Trigger>

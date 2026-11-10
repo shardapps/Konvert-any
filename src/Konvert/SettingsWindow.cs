@@ -4,7 +4,9 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using Microsoft.Win32;
+using Ellipse = System.Windows.Shapes.Ellipse;
 
 namespace Konvert;
 
@@ -54,7 +56,7 @@ public sealed class SettingsWindow : Window
         var title = new DockPanel { Margin = new Thickness(24, 12, 14, 0) };
         title.MouseLeftButtonDown += (_, e) => { if (e.OriginalSource is TextBlock or DockPanel) DragMove(); };
         var close = Ui.IconButton("close", "Close settings", (_, _) => Close()); DockPanel.SetDock(close, Dock.Right); title.Children.Add(close);
-        var heading = Ui.Text("Konvert  /  Settings", 15, weight: FontWeights.SemiBold); heading.VerticalAlignment = VerticalAlignment.Center; title.Children.Add(heading);
+        var heading = Ui.Text("Konvert Settings", 16, weight: FontWeights.SemiBold); heading.VerticalAlignment = VerticalAlignment.Center; title.Children.Add(heading);
         Grid.SetColumnSpan(title, 2); root.Children.Add(title);
         var sidebar = new StackPanel { Margin = new Thickness(18, 24, 12, 0) };
         AddNav(sidebar, "appearance", "Appearance", "palette"); AddNav(sidebar, "conversion", "Conversion", "convert");
@@ -84,7 +86,11 @@ public sealed class SettingsWindow : Window
     private void Navigate(string id)
     {
         foreach (var item in navigation)
-            item.Value.SetResourceReference(Control.BorderBrushProperty, item.Key == id ? "Accent" : "Outline");
+        {
+            var current = item.Key == id;
+            item.Value.SetResourceReference(Control.BorderBrushProperty, current ? "Accent" : "Outline");
+            item.Value.SetResourceReference(Control.BackgroundProperty, current ? "StateTint" : "Surface");
+        }
         page.Content = id switch { "conversion" => ConversionPage(), "windows" => WindowsPage(), "engines" => EnginesPage(), "about" => AboutPage(), _ => AppearancePage() };
     }
     private StackPanel Section(string title, string description)
@@ -95,34 +101,77 @@ public sealed class SettingsWindow : Window
     }
     private UIElement AppearancePage()
     {
-        var content = Section("A little more you.", "Choose a surface. Your shortcut and conversion flow stay the same.");
+        var content = Section("Appearance", "Choose a theme to preview it. Select Save to keep your changes.");
         var tiles = new WrapPanel();
+        var choices = new List<(AppTheme Theme, Button Tile, IconControl Selected)>();
         foreach (var theme in ThemeManager.Themes)
         {
             var preview = new StackPanel { Width = 128 };
-            var swatch = new Grid { Width = 124, Height = 66 };
-            var surface = new Border { Background = ThemeManager.Brush(theme.Chrome), CornerRadius = new CornerRadius(13), BorderBrush = ThemeManager.Brush(theme.Outline), BorderThickness = new Thickness(1) }; swatch.Children.Add(surface);
-            var icon = new IconControl { Kind = "convert", Ink = ThemeManager.Brush(theme.Accent), Width = 30, Height = 30 }; swatch.Children.Add(icon);
-            preview.Children.Add(swatch); var label = Ui.Text(theme.Name, 13, weight: FontWeights.SemiBold); label.Margin = new Thickness(0, 10, 0, 3); preview.Children.Add(label);
-            preview.Children.Add(Ui.Text(theme.Glass ? "Default · translucent" : theme.Description, 10, "Muted"));
-            var button = new Button { Content = preview, Padding = new Thickness(12), Margin = new Thickness(0, 0, 10, 10), BorderThickness = new Thickness(theme.Id == selectedTheme ? 2 : 1) };
-            AutomationProperties.SetName(button, theme.Name + " theme");
-            if (theme.Id == selectedTheme) button.SetResourceReference(Control.BorderBrushProperty, "Accent");
+            preview.Children.Add(ThemeSwatch(theme));
+            var title = new DockPanel { Margin = new Thickness(0, 8, 0, 3) };
+            var selected = Ui.Icon("check", 14, "Accent");
+            DockPanel.SetDock(selected, Dock.Right);
+            title.Children.Add(selected);
+            title.Children.Add(Ui.Text(theme.Name, 13, weight: FontWeights.SemiBold));
+            preview.Children.Add(title);
+            preview.Children.Add(Ui.Text(theme.Description, 10, "Muted"));
+            var button = new Button { Content = preview, Padding = new Thickness(10), Margin = new Thickness(0, 0, 10, 10) };
+            choices.Add((theme, button, selected));
             button.Click += (_, _) =>
             {
-                selectedTheme = theme.Id; ThemeManager.Apply(selectedTheme, Application.Current.Resources);
-                WindowEffects.ApplyBackdrop(this); Navigate("appearance");
+                selectedTheme = theme.Id;
+                ThemeManager.Apply(selectedTheme, Application.Current.Resources);
+                WindowEffects.ApplyBackdrop(this);
+                RefreshSelection();
             };
             tiles.Children.Add(button);
         }
+        RefreshSelection();
         content.Children.Add(tiles);
         Detach(motion); content.Children.Add(motion);
-        content.Children.Add(Ui.Text("Glass uses translucent surfaces and restrained highlights. Windows backdrop effects are used where available. High contrast uses system colors.", 11, "Muted"));
+        content.Children.Add(Ui.Text("Glass is the default. Windows high contrast uses your system colors.", 11, "Muted"));
         return content;
+
+        void RefreshSelection()
+        {
+            foreach (var (theme, tile, mark) in choices)
+            {
+                var current = theme.Id == selectedTheme;
+                mark.Visibility = current ? Visibility.Visible : Visibility.Hidden;
+                tile.SetResourceReference(Control.BorderBrushProperty, current ? "Accent" : "Outline");
+                tile.SetResourceReference(Control.BackgroundProperty, current ? "StateTint" : "Surface");
+                AutomationProperties.SetName(tile, current ? $"{theme.Name} theme, selected" : $"{theme.Name} theme");
+            }
+        }
+    }
+    private static Border ThemeSwatch(AppTheme theme)
+    {
+        var rings = new Canvas { Width = 66, Height = 60, HorizontalAlignment = HorizontalAlignment.Center };
+        var outline = ThemeManager.Brush(theme.Outline);
+        var accent = ThemeManager.Brush(theme.Accent);
+        AddDot(33, 30, 53, ThemeManager.Brush(theme.Chrome), outline);
+        var button = ThemeManager.Brush(theme.Raised);
+        AddDot(33, 12, 12, button, outline);
+        AddDot(15, 30, 12, button, outline);
+        AddDot(51, 30, 12, button, outline);
+        AddDot(33, 30, 20, ThemeManager.Brush(theme.Surface), accent);
+        var icon = new IconControl { Kind = "convert", Ink = accent, Width = 12, Height = 12 };
+        Canvas.SetLeft(icon, 27);
+        Canvas.SetTop(icon, 24);
+        rings.Children.Add(icon);
+        return new Border { Background = ThemeManager.Brush(theme.Raised), CornerRadius = new CornerRadius(12), Child = rings };
+
+        void AddDot(double x, double y, double size, Brush fill, Brush stroke)
+        {
+            var dot = new Ellipse { Width = size, Height = size, Fill = fill, Stroke = stroke };
+            Canvas.SetLeft(dot, x - size / 2);
+            Canvas.SetTop(dot, y - size / 2);
+            rings.Children.Add(dot);
+        }
     }
     private UIElement ConversionPage()
     {
-        var content = Section("Keep the original.", "Every conversion creates a separate file. Existing filenames get a numbered suffix.");
+        var content = Section("Conversion", "Choose default output settings. Existing files are kept and new copies get a numbered suffix.");
         var card = new StackPanel(); card.Children.Add(Ui.Text("Save converted files", 15, weight: FontWeights.SemiBold));
         var hint = Ui.Text("These defaults apply when you open the popup’s options. A quick conversion saves beside the original.", 12, "Muted"); hint.Margin = new Thickness(0, 7, 0, 12); card.Children.Add(hint);
         Detach(folder); var browse = Ui.IconButton("folder", "Choose output folder", (_, _) => { var dialog = new OpenFolderDialog(); if (dialog.ShowDialog(this) == true) folder.Text = dialog.FolderName; });
@@ -137,7 +186,7 @@ public sealed class SettingsWindow : Window
     }
     private UIElement WindowsPage()
     {
-        var content = Section("One shortcut. Right here.", "Select one file in Explorer or on the desktop, then press Ctrl+K. Other apps keep their own Ctrl+K shortcut.");
+        var content = Section("Windows integration", "Select one file in Explorer or on the desktop, then press Ctrl+K. Other apps keep their own Ctrl+K shortcut.");
         var actions = new StackPanel();
         actions.Children.Add(Ui.Text(NativeHostIntegration.IsRunning ? "Shortcut listener is running" : "Shortcut listener is stopped", 15, weight: FontWeights.SemiBold));
         var start = Ui.Button("Start shortcut listener", "keyboard", (_, _) => { try { NativeHostIntegration.Start(); feedback.Text = "Ctrl+K is ready in Explorer."; } catch (Exception ex) { feedback.Text = ex.Message; } }); start.Margin = new Thickness(0, 14, 0, 8); actions.Children.Add(start);
@@ -152,20 +201,21 @@ public sealed class SettingsWindow : Window
     }
     private UIElement EnginesPage()
     {
-        var content = Section("The right converter.", "Native image, text and table conversions work immediately. Add local engines for office documents and media.");
-        content.Children.Add(EngineCard("LibreOffice", capabilities.LibreOffice is not null, "Documents, spreadsheets and presentations. Includes DOCX → PDF without Microsoft Word.", office, "soffice.exe", "https://www.libreoffice.org/download/download-libreoffice/"));
+        var content = Section("Converters", "Native image, text and table conversions work immediately. Add local engines for office documents and media.");
+        content.Children.Add(EngineCard("LibreOffice", capabilities.LibreOffice is not null, "Documents, spreadsheets and presentations. Use a local installation for DOCX → PDF and other office exports.", office, "soffice.com", "https://www.libreoffice.org/download/download-libreoffice/", "soffice.exe"));
         var second = EngineCard("FFmpeg", capabilities.Ffmpeg is not null, "Audio, video and audio extraction. Only encoders provided by your FFmpeg build are offered.", ffmpeg, "ffmpeg.exe", "https://ffmpeg.org/download.html");
         second.Margin = new Thickness(0, 16, 0, 0); content.Children.Add(second);
         var note = Ui.Text("Engine downloads are separate to keep Konvert small. Install an engine, then reopen the popup or choose its executable here. Conversion stays local; unsupported or lossy routes are never presented as lossless.", 11, "Muted"); note.Margin = new Thickness(0, 18, 0, 0); content.Children.Add(note); return content;
     }
-    private Border EngineCard(string name, bool ready, string description, TextBox box, string executable, string url)
+    private Border EngineCard(string name, bool ready, string description, TextBox box, string executable, string url, string? alternate = null)
     {
         var panel = new StackPanel();
         panel.Children.Add(Ui.Text(name + (ready ? "  ·  Found" : "  ·  Not found"), 16, weight: FontWeights.SemiBold));
         var copy = Ui.Text(description, 12, "Muted"); copy.Margin = new Thickness(0, 8, 0, 14); panel.Children.Add(copy);
         Detach(box); panel.Children.Add(FieldRow(box, Ui.IconButton("folder", "Choose " + executable, (_, _) =>
         {
-            var dialog = new OpenFileDialog { Filter = executable + "|" + executable, CheckFileExists = true };
+            var filter = alternate is null ? executable : $"{executable};{alternate}";
+            var dialog = new OpenFileDialog { Title = $"Choose {name} executable", Filter = $"{name}|{filter}", CheckFileExists = true };
             if (dialog.ShowDialog(this) == true) box.Text = dialog.FileName;
         })));
         var button = Ui.Button("Get " + name, "download", (_, _) => OpenUrl(url)); button.Margin = new Thickness(0, 12, 0, 0); panel.Children.Add(button);
@@ -185,7 +235,7 @@ public sealed class SettingsWindow : Window
         try
         {
             if (!string.IsNullOrWhiteSpace(folder.Text) && !Directory.Exists(folder.Text)) throw new IOException("Choose an existing output folder.");
-            ValidateEngine(office.Text, "soffice.exe"); ValidateEngine(ffmpeg.Text, "ffmpeg.exe");
+            ValidateEngine(office.Text, "soffice.com", "soffice.exe"); ValidateEngine(ffmpeg.Text, "ffmpeg.exe");
             Settings = original with
             {
                 Theme = selectedTheme,
@@ -207,11 +257,11 @@ public sealed class SettingsWindow : Window
         catch (Exception ex) { feedback.Text = ex.Message; }
     }
     private void OpenUrl(string url) { try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch (Exception ex) { feedback.Text = ex.Message; } }
-    private static void ValidateEngine(string path, string expected)
+    private static void ValidateEngine(string path, params string[] expected)
     {
         if (string.IsNullOrWhiteSpace(path)) return;
-        if (!Path.IsPathFullyQualified(path) || !File.Exists(path) || !Path.GetFileName(path).Equals(expected, StringComparison.OrdinalIgnoreCase))
-            throw new IOException("Choose an existing absolute path to " + expected + ".");
+        if (!Path.IsPathFullyQualified(path) || !File.Exists(path) || !expected.Contains(Path.GetFileName(path), StringComparer.OrdinalIgnoreCase))
+            throw new IOException("Choose an existing path to " + string.Join(" or ", expected) + ".");
     }
     private static DockPanel FieldRow(UIElement field, UIElement button)
     {

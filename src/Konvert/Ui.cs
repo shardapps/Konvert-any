@@ -20,8 +20,8 @@ internal static class Ui
     public static Button Button(string text, string icon, RoutedEventHandler action, bool primary = false)
     {
         var content = new StackPanel { Orientation = Orientation.Horizontal };
-        content.Children.Add(Icon(icon, 18, primary ? "Chrome" : "Ink"));
-        var label = Text(text, 13, primary ? "Chrome" : "Ink", FontWeights.SemiBold); label.Margin = new Thickness(9, 0, 0, 0); content.Children.Add(label);
+        content.Children.Add(Icon(icon, 18, primary ? "OnAccent" : "Ink"));
+        var label = Text(text, 13, primary ? "OnAccent" : "Ink", FontWeights.SemiBold); label.Margin = new Thickness(9, 0, 0, 0); content.Children.Add(label);
         var button = new Button { Content = content, Padding = new Thickness(16, 12, 16, 12) };
         if (primary) button.SetResourceReference(Control.BackgroundProperty, "Accent");
         AutomationProperties.SetName(button, text); button.Click += action; return button;
@@ -36,4 +36,33 @@ internal static class Ui
         var card = new Border { Child = child, CornerRadius = new CornerRadius(radius), Padding = padding ?? new Thickness(22), BorderThickness = new Thickness(1) };
         card.SetResourceReference(Border.BackgroundProperty, "Surface"); card.SetResourceReference(Border.BorderBrushProperty, "Outline"); return card;
     }
+
+    public static string FormatName(string extension) => extension switch
+    {
+        "pdf" => "PDF document",
+        "txt" => "Plain text",
+        "docx" => "Word document",
+        "odt" => "OpenDocument text",
+        "xlsx" => "Excel workbook",
+        "ods" => "OpenDocument spreadsheet",
+        "pptx" => "PowerPoint presentation",
+        "odp" => "OpenDocument presentation",
+        "csv" => "Comma-separated values",
+        "tsv" => "Tab-separated values",
+        "jpg" => "JPEG image",
+        "json" => "JSON data",
+        _ => $"{extension.ToUpperInvariant()} {FormatCategory(extension).ToLowerInvariant()}"
+    };
+
+    public static string FormatCategory(string extension) => extension switch
+    {
+        "png" or "jpg" or "bmp" or "tiff" or "gif" => "Image",
+        "txt" or "html" or "rtf" => "Text",
+        "csv" or "tsv" or "xlsx" or "ods" => "Table",
+        "pptx" or "odp" => "Slides",
+        "mp3" or "wav" or "flac" or "ogg" or "m4a" or "opus" => "Audio",
+        "mp4" or "webm" or "mkv" => "Video",
+        "json" => "Data",
+        _ => "Document"
+    };
 }

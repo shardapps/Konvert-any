@@ -5,7 +5,7 @@ using System.Windows.Media;
 
 namespace Konvert;
 
-public sealed record PopupAnchor(double X, double Y);
+public sealed record PopupAnchor(double X, double Y, double? ItemTop = null);
 public sealed record PopupBounds(double Left, double Top);
 
 public static class WindowEffects
@@ -22,12 +22,37 @@ public static class WindowEffects
         var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
         if (!GetMonitorInfo(monitor, ref info)) return anchor;
         var dpi = GetDpiForMonitor(monitor, 0, out var monitorDpi, out _) == 0 ? monitorDpi / 96.0 : 1;
-        var width = window.Width * dpi;
-        var height = Math.Min(window.Height * dpi, info.Work.Bottom - info.Work.Top - 20);
-        var position = Clamp(anchor.X, anchor.Y + (height - ringSize * dpi) / 2,
-            width, height, info.Work.Left, info.Work.Top, info.Work.Right, info.Work.Bottom);
-        SetWindowPos(handle, new IntPtr(-1), (int)position.Left, (int)position.Top, (int)width, (int)height, 0x0010);
+        var workArea = new Rect(info.Work.Left, info.Work.Top, info.Work.Right - info.Work.Left, info.Work.Bottom - info.Work.Top);
+        var position = FitBesideSelection(anchor, new Size(window.Width * dpi, window.Height * dpi), ringSize * dpi, workArea, dpi);
+        SetWindowPos(handle, IntPtr.Zero, (int)position.Left, (int)position.Top,
+            (int)position.Width, (int)position.Height, 0x0014); // SWP_NOACTIVATE | SWP_NOZORDER
         return anchor;
+    }
+
+    internal static Rect FitBesideSelection(PopupAnchor anchor, Size desired, double ringHeight, Rect workArea, double scale = 1)
+    {
+        var margin = 10 * scale;
+        var gap = 8 * scale;
+        var top = workArea.Top + margin;
+        var bottom = Math.Max(top + 1, workArea.Bottom - margin);
+        var left = workArea.Left + margin;
+        var right = Math.Max(left + 1, workArea.Right - margin);
+        var width = Math.Min(desired.Width, right - left);
+        var x = Math.Clamp(anchor.X - width / 2, left, right - width);
+        var below = Math.Clamp(anchor.Y + gap, top, bottom);
+        var above = Math.Clamp((anchor.ItemTop ?? anchor.Y) - gap, top, bottom);
+        var roomBelow = bottom - below;
+        var roomAbove = above - top;
+        var minimumHeight = Math.Min(desired.Height, ringHeight + 64 * scale);
+        if (roomBelow >= minimumHeight || (roomBelow >= ringHeight && roomBelow >= roomAbove))
+            return new(x, below, width, Math.Min(desired.Height, roomBelow));
+        if (roomAbove >= ringHeight)
+        {
+            var height = Math.Min(desired.Height, roomAbove);
+            return new(x, above - height, width, height);
+        }
+        var fitted = Math.Min(desired.Height, bottom - top);
+        return new(x, Math.Clamp(anchor.Y - fitted / 2, top, bottom - fitted), width, fitted);
     }
 
     public static void ApplyBackdrop(Window window)

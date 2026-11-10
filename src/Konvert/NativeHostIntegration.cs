@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
 namespace Konvert;
@@ -43,4 +44,20 @@ public static class NativeHostIntegration
 
     private static bool OwnsStartup(string command) =>
         command.Trim().Trim('"').Equals(HostPath, StringComparison.OrdinalIgnoreCase);
+
+    internal static void PopupWasDismissed() => NotifyHost(0x8003, Environment.ProcessId);
+
+    internal static void ReportBackgroundResult(bool saved) => NotifyHost(0x8004, saved ? 1 : 2);
+
+    private static void NotifyHost(uint message, int value)
+    {
+        var listener = FindWindowEx(new IntPtr(-3), IntPtr.Zero, "Shardapps.Konvert.HotkeyHost", null);
+        if (listener != IntPtr.Zero) PostMessage(listener, message, new IntPtr(value), IntPtr.Zero);
+    }
+
+    [DllImport("user32.dll", EntryPoint = "FindWindowExW", CharSet = CharSet.Unicode)]
+    private static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string className, string? title);
+
+    [DllImport("user32.dll", EntryPoint = "PostMessageW")]
+    private static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
 }

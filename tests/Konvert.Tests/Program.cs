@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
@@ -15,6 +16,20 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        if (args is ["--hold-pipe"])
+        {
+            Thread.Sleep(TimeSpan.FromSeconds(15));
+            return 0;
+        }
+        if (args is ["--spawn-pipe-holder", var pidFile])
+        {
+            var start = SelfStart("--hold-pipe");
+            start.RedirectStandardInput = true; // Keep the launcher's stdout and stderr handles in the child.
+            using var child = Process.Start(start)!;
+            File.WriteAllText(pidFile, child.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            Thread.Sleep(150);
+            return 0;
+        }
         Directory.CreateDirectory(Root);
         try { RunAsync(args).GetAwaiter().GetResult(); }
         finally { Directory.Delete(Root, true); }
@@ -40,6 +55,7 @@ internal static class Program
         await Test("Picker explains missing and unsupported inputs and opens converter setup", () => PickerTests.VerifyRecovery(Root));
         await Test("Picker quick and expanded actions save to their respective folders", () => PickerTests.VerifySavePaths(Root));
         await Test("Picker shows conversion errors and can retry another route", () => PickerTests.VerifyFailedJobCanRetry(Root));
+        await Test("Dismissing a busy popup hides it and preserves the conversion", () => PickerTests.VerifyBackgroundSave(Root));
         await Test("Seven persistent themes and high contrast fallback", () =>
         {
             Equal(7, ThemeManager.Themes.Count);
@@ -48,13 +64,24 @@ internal static class Program
                 var resources = new System.Windows.ResourceDictionary();
                 ThemeManager.Apply(theme.Id, resources, false);
                 Equal(theme.Id, ThemeManager.Current.Id);
-                True(resources["Ink"] is SolidColorBrush);
+                True(Contrast("Ink", "TooltipFill") >= 4.5);
+                True(Contrast("Muted", "Raised") >= 4.5);
+                True(Contrast("OnAccent", "Accent") >= 4.5);
                 Equal(theme.Id, (new ConversionSettings { Theme = theme.Id }).Validate().Theme);
+
+                double Contrast(string foreground, string background)
+                {
+                    var first = Luminance(((SolidColorBrush)resources[foreground]).Color);
+                    var second = Luminance(((SolidColorBrush)resources[background]).Color);
+                    return (Math.Max(first, second) + 0.05) / (Math.Min(first, second) + 0.05);
+                }
             }
             var contrast = new System.Windows.ResourceDictionary();
             ThemeManager.Apply("glass", contrast, true);
             Equal(System.Windows.SystemColors.WindowBrush, contrast["Surface"]);
             Equal("glass", (new ConversionSettings { Theme = "invalid" }).Validate().Theme);
+
+            static double Luminance(Color color) => 0.2126 * color.ScR + 0.7152 * color.ScG + 0.0722 * color.ScB;
         });
         await Test("Popup clamps to negative-coordinate and small monitor work areas", () =>
         {
@@ -62,6 +89,20 @@ internal static class Program
             Equal(-1910.0, left.Left); Equal(10.0, left.Top);
             var right = WindowEffects.Clamp(1910, 1070, 560, 560, 0, 0, 1920, 1080);
             Equal(1350.0, right.Left); Equal(510.0, right.Top);
+        });
+        await Test("The picker opens below the selected row and flips above the taskbar", () =>
+        {
+            var desktop = new System.Windows.Rect(0, 0, 900, 760);
+            var below = WindowEffects.FitBesideSelection(new(400, 160, 130), new(224, 470), 224, desktop);
+            Equal(168.0, below.Top);
+            var above = WindowEffects.FitBesideSelection(new(855, 690, 660), new(224, 400), 224, desktop);
+            Equal(652.0, above.Bottom);
+            Equal(890.0, above.Right);
+            var shortDrawer = WindowEffects.FitBesideSelection(new(400, 450, 422), new(224, 470), 224, desktop);
+            Equal(458.0, shortDrawer.Top);
+            Equal(750.0, shortDrawer.Bottom);
+            var drawerAtEdge = WindowEffects.FitBesideSelection(new(400, 512, 484), new(224, 470), 224, desktop);
+            Equal(476.0, drawerAtEdge.Bottom);
         });
         await Test("Unavailable office routes explain engine setup rather than disappearing", () =>
         {
@@ -212,6 +253,35 @@ internal static class Program
         });
         await TestAsync("External process timeout terminates worker", async () =>
             await ThrowsAsync<TimeoutException>(() => ExternalProcess.RunAsync("ping.exe", ["-n", "20", "127.0.0.1"], TimeSpan.FromMilliseconds(100), CancellationToken.None)));
+        await TestAsync("An exited launcher cannot hold the conversion open through an inherited pipe", async () =>
+        {
+            var pidFile = Path.Combine(Root, "pipe-holder.pid");
+            var launcher = SelfStart("--spawn-pipe-holder", pidFile);
+            var elapsed = Stopwatch.StartNew();
+            try
+            {
+                await ThrowsAsync<TimeoutException>(() => ExternalProcess.RunAsync(launcher.FileName, launcher.ArgumentList,
+                    TimeSpan.FromSeconds(2), CancellationToken.None));
+                True(File.Exists(pidFile));
+                True(elapsed.Elapsed < TimeSpan.FromSeconds(6));
+            }
+            finally
+            {
+                if (File.Exists(pidFile) && int.TryParse(File.ReadAllText(pidFile), out var pid))
+                {
+                    try
+                    {
+                        using var child = Process.GetProcessById(pid);
+                        if (!child.WaitForExit(2000))
+                        {
+                            child.Kill();
+                            throw new InvalidOperationException("The inherited-pipe child escaped process cleanup.");
+                        }
+                    }
+                    catch (ArgumentException) { /* The child already exited. */ }
+                }
+            }
+        });
 
         var capabilities = await EngineCapabilities.DetectAsync(new());
         if (capabilities.Ffmpeg is null)
@@ -270,6 +340,15 @@ internal static class Program
         }
         else if (args.Contains("--require-office")) { failures++; Console.WriteLine("FAIL LibreOffice is required but missing"); }
         else Console.WriteLine("SKIP optional LibreOffice integration (not installed)");
+    }
+
+    private static ProcessStartInfo SelfStart(params string[] arguments)
+    {
+        var start = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false, CreateNoWindow = true };
+        if (Path.GetFileNameWithoutExtension(start.FileName).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
+            start.ArgumentList.Add(typeof(Program).Assembly.Location);
+        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        return start;
     }
 
     private static string MakeDocx(string name, string content)

@@ -20,7 +20,7 @@ public sealed record EngineCapabilities(string? LibreOffice, string? Ffmpeg, IRe
         try
         {
             var output = await ExternalProcess.RunAsync(ffmpeg, ["-hide_banner", "-encoders"], TimeSpan.FromSeconds(8), cancellationToken);
-            foreach (var line in output.Split('\n'))
+            foreach (var line in output.StandardOutput.Split('\n'))
             {
                 var parts = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length > 1 && parts[0].Length == 6) encoders.Add(parts[1]);
@@ -37,7 +37,7 @@ public sealed record EngineCapabilities(string? LibreOffice, string? Ffmpeg, IRe
             var output = await ExternalProcess.RunAsync(probe,
                 ["-v", "error", "-protocol_whitelist", "file,pipe", "-show_entries", "stream=codec_type:stream_disposition=attached_pic",
                     "-of", "json", "-i", Path.GetFullPath(source)], TimeSpan.FromSeconds(5), cancellationToken);
-            using var json = JsonDocument.Parse(output);
+            using var json = JsonDocument.Parse(output.StandardOutput);
             var streams = json.RootElement.GetProperty("streams").EnumerateArray().ToArray();
             return capabilities with
             {
@@ -53,7 +53,7 @@ public sealed record EngineCapabilities(string? LibreOffice, string? Ffmpeg, IRe
     internal static EngineCapabilities Locate(ConversionSettings settings, string? source = null)
     {
         var office = source is null || FormatRegistry.Uses(source, ConversionBackend.Office)
-            ? Resolve(settings.LibreOfficePath, "soffice.exe", "LibreOffice", "program")
+            ? ResolveOffice(settings.LibreOfficePath)
             : null;
         var ffmpeg = source is null || FormatRegistry.Uses(source, ConversionBackend.Media)
             ? Resolve(settings.FfmpegPath, "ffmpeg.exe")
@@ -63,6 +63,17 @@ public sealed record EngineCapabilities(string? LibreOffice, string? Ffmpeg, IRe
 
     private static bool ProbeFailed(Exception ex) =>
         ex is IOException or InvalidOperationException or System.ComponentModel.Win32Exception or TimeoutException;
+
+    private static string? ResolveOffice(string? configured)
+    {
+        var engine = Resolve(configured, "soffice.com", "LibreOffice", "program") ??
+            (string.IsNullOrWhiteSpace(configured) ? Resolve(null, "soffice.exe", "LibreOffice", "program") : null);
+        if (engine is null) return null;
+        if (Path.GetFileName(engine).Equals("soffice.com", StringComparison.OrdinalIgnoreCase)) return engine;
+        if (!Path.GetFileName(engine).Equals("soffice.exe", StringComparison.OrdinalIgnoreCase)) return null;
+        var console = Path.ChangeExtension(engine, ".com");
+        return File.Exists(console) ? console : engine;
+    }
 
     private static string? Resolve(string? configured, string executable, params string[] subdirectories)
     {
