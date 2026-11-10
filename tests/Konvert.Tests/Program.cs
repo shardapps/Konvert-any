@@ -29,14 +29,17 @@ internal static class Program
             var app = new App { ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown };
             app.InitializeComponent();
             var window = new MainWindow(preferences: new());
-            var popup = new MainWindow("sample.docx", preferences: new());
+            var popup = new MainWindow(Put("popup.txt", "Preview fixture"), preferences: new());
             var settingsWindow = new SettingsWindow(new(), new(null, null, new HashSet<string>()));
             True(((SolidColorBrush)window.Background).Color.A < 255);
             Equal(System.Windows.WindowStyle.None, settingsWindow.WindowStyle);
-            True(popup.AllowsTransparency); True(popup.ShowInTaskbar);
-            Equal(560.0, popup.Width); Equal(560.0, popup.Height);
+            True(popup.AllowsTransparency);
+            Equal(224.0, popup.Width); Equal(224.0, popup.Height);
             settingsWindow.Close(); popup.Close(); window.Close();
         });
+        await Test("Picker explains missing and unsupported inputs and opens converter setup", () => PickerTests.VerifyRecovery(Root));
+        await Test("Picker quick and expanded actions save to their respective folders", () => PickerTests.VerifySavePaths(Root));
+        await Test("Picker shows conversion errors and can retry another route", () => PickerTests.VerifyFailedJobCanRetry(Root));
         await Test("Seven persistent themes and high contrast fallback", () =>
         {
             Equal(7, ThemeManager.Themes.Count);
@@ -75,6 +78,20 @@ internal static class Program
             True(registry.GetTargets("photo.PNG").Any(t => t.Extension == "pdf"));
             True(registry.GetTargets("report.docx").All(t => t.Extension == "txt"));
             Equal(0, registry.GetTargets("unknown.exe").Count);
+        });
+        await Test("Resolved routes honor aliases and actual media streams", () =>
+        {
+            var capabilities = new EngineCapabilities(null, "ffmpeg.exe", new HashSet<string> { "libx264", "aac", "libmp3lame" })
+            {
+                HasAudio = false,
+                HasVideo = true
+            };
+            var registry = new FormatRegistry(capabilities);
+            True(registry.GetTargets("clip.avi").Any(target => target.Extension == "mp4"));
+            True(!registry.GetOptions("clip.avi").Any(option => option.Target.Extension == "mp3"));
+            True(registry.Resolve("clip.avi", "mp3") is null);
+            True(registry.Resolve("photo.JPEG", "jpg") is null);
+            Equal("jpg", registry.Resolve("photo.png", ".JPEG")!.Extension);
         });
         await Test("CSV parser handles multiline, quotes, trailing fields", () =>
         {

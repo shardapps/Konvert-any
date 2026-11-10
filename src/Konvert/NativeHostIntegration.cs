@@ -12,7 +12,11 @@ public static class NativeHostIntegration
     }
     public static bool StartsWithWindows
     {
-        get { using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"); return key?.GetValue("Shardapps.Konvert") is string; }
+        get
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+            return key?.GetValue("Shardapps.Konvert") is string command && OwnsStartup(command);
+        }
     }
     public static void Start()
     {
@@ -26,7 +30,17 @@ public static class NativeHostIntegration
     public static void SetStartup(bool enabled)
     {
         using var key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
-        if (enabled) key.SetValue("Shardapps.Konvert", $"\"{HostPath}\"");
-        else key.DeleteValue("Shardapps.Konvert", false);
+        if (enabled)
+        {
+            if (!File.Exists(HostPath)) throw new FileNotFoundException("The shortcut listener is missing. Repair the Konvert installation.");
+            key.SetValue("Shardapps.Konvert", $"\"{HostPath}\"");
+        }
+        else if (key.GetValue("Shardapps.Konvert") is string command && OwnsStartup(command))
+        {
+            key.DeleteValue("Shardapps.Konvert", false);
+        }
     }
+
+    private static bool OwnsStartup(string command) =>
+        command.Trim().Trim('"').Equals(HostPath, StringComparison.OrdinalIgnoreCase);
 }

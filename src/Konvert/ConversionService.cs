@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using System.Text;
+using System.Globalization;
 
 namespace Konvert;
 
@@ -8,14 +8,18 @@ public sealed class ConversionService(EngineCapabilities capabilities) : IDispos
     // One heavy conversion per process prevents parallel image decodes from multiplying peak RAM.
     private readonly SemaphoreSlim gate = new(1, 1);
 
-    public async Task<ConversionResult> ConvertAsync(string input, string extension, ConversionSettings settings, CancellationToken cancellationToken = default)
+    public Task<ConversionResult> ConvertAsync(string input, string extension, ConversionSettings settings, CancellationToken cancellationToken = default) =>
+        Task.Run(() => ConvertCoreAsync(input, extension, settings, cancellationToken), cancellationToken);
+
+    private async Task<ConversionResult> ConvertCoreAsync(string input, string extension, ConversionSettings settings, CancellationToken cancellationToken)
     {
         input = Path.GetFullPath(input);
         settings = settings.Validate();
-        extension = extension.TrimStart('.').ToLowerInvariant();
         if (!File.Exists(input)) throw new FileNotFoundException("The source file no longer exists.", input);
-        var target = new FormatRegistry(capabilities).GetTargets(input).FirstOrDefault(t => t.Extension == extension)
+        var route = new FormatRegistry(capabilities).Resolve(input, extension)
             ?? throw new NotSupportedException("This conversion is not available. Check the format and optional engines in Settings.");
+        var source = FormatRegistry.SourceExtension(input);
+        extension = route.Extension;
         await gate.WaitAsync(cancellationToken);
         var timer = Stopwatch.StartNew();
         string? staging = null;
@@ -24,14 +28,24 @@ public sealed class ConversionService(EngineCapabilities capabilities) : IDispos
             var directory = settings.OutputDirectory ?? Path.GetDirectoryName(input)!;
             if (!Directory.Exists(directory)) throw new DirectoryNotFoundException("The output folder does not exist. Choose another folder in Settings.");
             staging = Path.Combine(directory, $".konvert-{Guid.NewGuid():N}.{extension}");
-            if (target.Engine == "LibreOffice") await ConvertOfficeAsync(input, staging, extension, cancellationToken);
-            else if (target.Engine == "FFmpeg") await ConvertMediaAsync(input, staging, extension, cancellationToken);
-            else await RunStaAsync(() =>
+            switch (route.Backend)
             {
-                if (FormatRegistry.Images.Contains(Path.GetExtension(input).TrimStart('.').ToLowerInvariant()))
-                    ImageConverter.Convert(input, staging, extension, settings, cancellationToken);
-                else TextConverter.Convert(input, staging, Path.GetExtension(input).TrimStart('.').ToLowerInvariant(), extension, cancellationToken);
-            }, cancellationToken);
+                case ConversionBackend.Office:
+                    await ConvertOfficeAsync(input, staging, extension, cancellationToken);
+                    break;
+                case ConversionBackend.Media:
+                    await ConvertMediaAsync(input, staging, route, cancellationToken);
+                    break;
+                case ConversionBackend.Image:
+                    await RunStaAsync(() => ImageConverter.Convert(input, staging, extension, settings, cancellationToken), cancellationToken);
+                    break;
+                case ConversionBackend.Table:
+                    TableConverter.Convert(input, staging, source, extension, cancellationToken);
+                    break;
+                case ConversionBackend.Text:
+                    TextConverter.Convert(input, staging, source, extension, cancellationToken);
+                    break;
+            }
             cancellationToken.ThrowIfCancellationRequested();
             if (!File.Exists(staging) || new FileInfo(staging).Length == 0 && extension != "txt")
                 throw new IOException("The engine did not produce a valid output file.");
@@ -84,22 +98,15 @@ public sealed class ConversionService(EngineCapabilities capabilities) : IDispos
         }
     }
 
-    private async Task ConvertMediaAsync(string input, string output, string extension, CancellationToken token)
+    private async Task ConvertMediaAsync(string input, string output, ConversionRoute route, CancellationToken token)
     {
-        var arguments = new List<string> { "-hide_banner", "-nostdin", "-loglevel", "error", "-n", "-protocol_whitelist", "file,pipe", "-threads", "2", "-filter_threads", "2", "-i", input, "-map_metadata", "-1" };
-        arguments.AddRange(extension switch
-        {
-            "mp3" => ["-map", "0:a:0", "-vn", "-c:a", "libmp3lame", "-q:a", "2"],
-            "wav" => ["-map", "0:a:0", "-vn", "-c:a", "pcm_s16le"],
-            "flac" => ["-map", "0:a:0", "-vn", "-c:a", "flac"],
-            "ogg" => ["-map", "0:a:0", "-vn", "-c:a", "libvorbis", "-q:a", "5"],
-            "opus" => ["-map", "0:a:0", "-vn", "-c:a", "libopus", "-b:a", "128k"],
-            "m4a" => ["-map", "0:a:0", "-vn", "-c:a", "aac", "-b:a", "192k"],
-            "gif" => ["-map", "0:v:0", "-an", "-vf", "fps=12,scale=640:-1:flags=lanczos", "-c:v", "gif"],
-            "webm" => ["-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-c:a", "libopus"],
-            _ => ["-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac"]
-        });
-        arguments.AddRange(["-threads", "2", output]);
+        var threads = Math.Clamp(Environment.ProcessorCount / 2, 1, 4).ToString(CultureInfo.InvariantCulture);
+        string[] arguments =
+        [
+            "-hide_banner", "-nostdin", "-loglevel", "error", "-n", "-protocol_whitelist", "file,pipe",
+            "-threads", threads, "-filter_threads", threads, "-i", input, "-map_metadata", "-1",
+            .. route.Arguments!, "-threads", threads, output
+        ];
         await ExternalProcess.RunAsync(capabilities.Ffmpeg!, arguments, TimeSpan.FromMinutes(30), token);
     }
 

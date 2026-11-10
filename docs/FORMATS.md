@@ -31,7 +31,9 @@ See upstream [command-line parameters](https://help.libreoffice.org/latest/en-US
 
 ## Optional FFmpeg
 
-Install a trusted FFmpeg build separately, add it to PATH or select `ffmpeg.exe` in Settings. Konvert probes its encoder list on startup/settings changes; required encoders must exist before a target appears. Input demuxers/decoders and actual streams are validated only when converting.
+Install a trusted FFmpeg build separately, add it to PATH or select `ffmpeg.exe` in Settings. Konvert probes encoders for files with media routes. If the same directory contains FFprobe, it also checks for audio and video streams. The quick circle offers available routes. Open the chevron to see additional formats and links to engine setup.
+
+If the picker has no export for a file, its message tells you whether to choose a different file or open converter setup. If a job fails, the picker shows the cause and lets you retry or choose a different destination. Existing files and incomplete outputs are protected by staged writes.
 
 | Sources | Destinations |
 | --- | --- |

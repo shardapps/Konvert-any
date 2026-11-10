@@ -4,12 +4,10 @@
 #ifndef TargetArchitecture
   #error TargetArchitecture must be x64 or arm64
 #endif
-#ifndef AppVersion
-  #define AppVersion "0.2.0-alpha.1"
-#endif
+#define ProductId "{FB2E8267-E891-4CE0-8F84-441FB22E54E5}"
 
 [Setup]
-AppId={{FB2E8267-E891-4CE0-8F84-441FB22E54E5}
+AppId={{#ProductId}
 AppName=Konvert
 AppVersion={#AppVersion}
 AppPublisher=Shardapps
@@ -20,6 +18,7 @@ DefaultGroupName=Shardapps
 PrivilegesRequired=lowest
 MinVersion=10.0.22000
 DisableProgramGroupPage=yes
+DirExistsWarning=no
 #if TargetArchitecture == "arm64"
 ArchitecturesAllowed=arm64
 ArchitecturesInstallIn64BitMode=arm64
@@ -32,14 +31,15 @@ SetupMutex=Local\Shardapps.Konvert.Setup
 CloseApplications=yes
 RestartApplications=no
 ChangesEnvironment=yes
-UninstallDisplayIcon={app}\Konvert.exe
+UninstallDisplayIcon={app}\Konvert.App\Konvert.exe
 SetupIconFile=Assets\Konvert.ico
+WizardSmallImageFile=Assets\Square150x150Logo.png
 LicenseFile=..\LICENSE
 OutputBaseFilename=Konvert-Setup-{#AppVersion}-{#TargetArchitecture}
 Compression=lzma2/fast
 SolidCompression=yes
-WizardStyle=modern
-VersionInfoVersion=0.2.0.0
+WizardStyle=modern dynamic
+VersionInfoVersion={#FileVersion}
 VersionInfoDescription=Konvert by Shardapps Setup
 SignedUninstaller=no
 
@@ -49,32 +49,35 @@ Name: "startup"; Description: "Keep Ctrl+K ready when you sign in"; GroupDescrip
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
 
 [Files]
-Source: "{#PayloadDirectory}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PayloadDirectory}\Konvert.exe"; Flags: dontcopy
+Source: "{#PayloadDirectory}\Konvert.dll"; Flags: dontcopy
+Source: "{#PayloadDirectory}\Konvert.deps.json"; Flags: dontcopy
+Source: "{#PayloadDirectory}\Konvert.runtimeconfig.json"; Flags: dontcopy
+Source: "{#PayloadDirectory}\KonvertHost.exe"; Flags: dontcopy
+Source: "LegacyAlpha.sha256"; Flags: dontcopy
+Source: "{#PayloadDirectory}\Konvert.exe"; DestDir: "{app}\Konvert.App"; Flags: ignoreversion
+Source: "{#PayloadDirectory}\Konvert.dll"; DestDir: "{app}\Konvert.App"; Flags: ignoreversion
+Source: "{#PayloadDirectory}\Konvert.deps.json"; DestDir: "{app}\Konvert.App"; Flags: ignoreversion
+Source: "{#PayloadDirectory}\Konvert.runtimeconfig.json"; DestDir: "{app}\Konvert.App"; Flags: ignoreversion
+Source: "{#PayloadDirectory}\KonvertHost.exe"; DestDir: "{app}\Konvert.App"; Flags: ignoreversion
+Source: "{#PayloadDirectory}\LICENSE"; DestDir: "{app}\Konvert.App"
+Source: "{#PayloadDirectory}\NOTICE"; DestDir: "{app}\Konvert.App"
+Source: "{#PayloadDirectory}\PRIVACY.md"; DestDir: "{app}\Konvert.App"
+Source: "{#PayloadDirectory}\THIRD_PARTY_NOTICES.md"; DestDir: "{app}\Konvert.App"
 
 [Icons]
-Name: "{group}\Konvert"; Filename: "{app}\Konvert.exe"; WorkingDir: "{app}"
-Name: "{autodesktop}\Konvert"; Filename: "{app}\Konvert.exe"; WorkingDir: "{app}"; Tasks: desktopicon
-
-[Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Shardapps.Konvert"; ValueData: """{app}\KonvertHost.exe"""; Tasks: startup; Flags: uninsdeletevalue
+Name: "{group}\Konvert"; Filename: "{app}\Konvert.App\Konvert.exe"; WorkingDir: "{app}\Konvert.App"
+Name: "{autodesktop}\Konvert"; Filename: "{app}\Konvert.App\Konvert.exe"; WorkingDir: "{app}\Konvert.App"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\Konvert.exe"; Parameters: "--install-integration"; Tasks: integration; Flags: runhidden waituntilterminated
-Filename: "{app}\KonvertHost.exe"; Flags: nowait runhidden
-Filename: "{app}\Konvert.exe"; Description: "Open Konvert"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Konvert.App\KonvertHost.exe"; Tasks: integration or startup; Flags: nowait runhidden
+Filename: "{app}\Konvert.App\Konvert.exe"; Description: "Open Konvert"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-Filename: "{app}\KonvertHost.exe"; Parameters: "--exit"; Flags: runhidden waituntilterminated; RunOnceId: "StopKonvertHost"
-Filename: "{app}\Konvert.exe"; Parameters: "--remove-integration"; Flags: runhidden waituntilterminated; RunOnceId: "RemoveKonvertIntegration"
+Filename: "{app}\Konvert.App\KonvertHost.exe"; Parameters: "--exit"; Flags: runhidden waituntilterminated; RunOnceId: "StopKonvertHost"
+; Replace the legacy log entry. Registry cleanup now works without the .NET runtime.
+Filename: "{app}\Konvert.App\KonvertHost.exe"; Parameters: "--exit"; Flags: runhidden waituntilterminated; RunOnceId: "RemoveKonvertIntegration"
 
 [Code]
-function PrepareToInstall(var NeedsRestart: Boolean): String;
-var
-  ResultCode: Integer;
-  HostPath: String;
-begin
-  Result := '';
-  HostPath := ExpandConstant('{app}\KonvertHost.exe');
-  if FileExists(HostPath) then
-    Exec(HostPath, '--exit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-end;
+#include "SetupIntegration.iss"
+#include "SetupUpgrade.iss"

@@ -1,6 +1,6 @@
 # Architecture
 
-Konvert 0.2 separates the persistent shortcut from the transient conversion UI.
+Konvert separates the persistent shortcut from the transient conversion UI.
 
 ```mermaid
 flowchart LR
@@ -23,7 +23,9 @@ The listener sleeps in GetMessage when idle. It exposes tray open/settings/pause
 
 ## UI and themes
 
-The managed application is .NET 10/WPF with software rendering. A file argument opens the frameless, per-pixel transparent radial popup; no file opens home/onboarding. Popup placement is monitor/work-area aware and clamped. The managed process exits after its windows close, while the separately controlled native listener remains.
+The managed application is .NET 10/WPF with software rendering. A file argument opens a 224 DIP popup. With no file it shows a compact picker. Placement respects monitor scale and work area. The chevron opens an options panel below the same circle. The managed process exits when its windows close.
+
+The conversion catalog maps each supported source and destination to a provider. Route availability and execution use the same definitions, including required media encoders. Conversion work leaves the UI thread before opening files. Image decoding uses an STA worker, CSV/TSV parsing streams through a reader, and external processes run asynchronously with bounded diagnostics.
 
 ThemeManager supplies seven color systems and system high contrast fallback. App.xaml contains original templates for buttons, sliders, switches, text boxes and scrollbars. IconControl renders original 24-unit vector paths. Settings previews themes and commits only on Save; cancellation restores the original theme. No screen-capture/refraction shader or permanent animation timer is used.
 

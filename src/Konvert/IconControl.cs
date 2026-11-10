@@ -25,6 +25,8 @@ public sealed class IconControl : FrameworkElement
         ["download"] = Parse("M12,3 L12,15 M7,10 L12,15 17,10 M4,16 L4,21 20,21 20,16"),
         ["check"] = Parse("M5,12 L10,17 20,6"),
         ["arrow"] = Parse("M4,12 L20,12 M14,6 L20,12 14,18"),
+        ["down"] = Parse("M6,9 L12,15 18,9"),
+        ["up"] = Parse("M6,15 L12,9 18,15"),
         ["close"] = Parse("M6,6 L18,18 M18,6 L6,18"),
         ["back"] = Parse("M16,5 L9,12 16,19"),
         ["more"] = Parse("M5,12 L5.2,12 M12,12 L12.2,12 M19,12 L19.2,12"),

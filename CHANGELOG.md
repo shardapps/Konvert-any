@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.1-alpha.1
+
+- Upgrade registered and orphaned standalone installs in place. Validate the desktop runtime first and remove only exact matches for known legacy files after installing.
+- Preserve converted files and preferences, carry forward owned Windows integration, and use branded light and dark setup visuals.
+- Explain missing files, unsupported formats, converter requirements and failed exports directly in the popup. Allow a failed or cancelled conversion to be retried.
+
+## 0.3.0-alpha.1
+
+- Use a 224 DIP circle with three quick formats and a chevron for extra formats, folder, quality and DPI. Quick clicks save beside the input with standard settings.
+- Fix popup dismissal reentrancy and prevent open preferences from blocking Explorer shortcuts.
+- Use one route catalog for discovery and execution. Probe media tracks when FFprobe is present, stream delimited tables and move conversion I/O off the UI thread.
+- Ship compact x64 and ARM64 setup EXEs that use the shared .NET 10 Desktop Runtime.
+
 ## 0.2.0-alpha.1 — 2026-10-25
 
 - Replace the large conversion screen with a frameless, file-centered radial popup; keep a separate home/onboarding screen.

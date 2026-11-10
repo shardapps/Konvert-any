@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -29,7 +30,11 @@ public sealed class SettingsWindow : Window
     {
         original = Settings = settings; this.capabilities = capabilities; selectedTheme = settings.Theme;
         Style = (Style)FindResource(typeof(Window));
-        Title = "Konvert · Settings"; Width = 830; Height = 720; MinWidth = 760; MinHeight = 560;
+        Title = "Konvert · Settings";
+        Width = Math.Min(780, SystemParameters.WorkArea.Width - 24);
+        Height = Math.Min(640, SystemParameters.WorkArea.Height - 24);
+        MinWidth = Math.Min(610, Width);
+        MinHeight = Math.Min(420, Height);
         WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.CanResizeWithGrip; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         quality.Value = settings.JpegQuality; dpi.Value = settings.Dpi; folder.Text = settings.OutputDirectory ?? "";
         qualityLabel.Text = $"JPEG / image PDF quality · {quality.Value:0}%";
@@ -44,7 +49,7 @@ public sealed class SettingsWindow : Window
         AutomationProperties.SetName(quality, "JPEG and image PDF quality, percent");
         AutomationProperties.SetName(dpi, "Image output DPI. Pixel dimensions stay unchanged.");
         var root = new Grid { Margin = new Thickness(1) };
-        root.ColumnDefinitions.Add(new() { Width = new GridLength(190) }); root.ColumnDefinitions.Add(new());
+        root.ColumnDefinitions.Add(new() { Width = new GridLength(170) }); root.ColumnDefinitions.Add(new());
         root.RowDefinitions.Add(new() { Height = new GridLength(60) }); root.RowDefinitions.Add(new()); root.RowDefinitions.Add(new() { Height = new GridLength(78) });
         var title = new DockPanel { Margin = new Thickness(24, 12, 14, 0) };
         title.MouseLeftButtonDown += (_, e) => { if (e.OriginalSource is TextBlock or DockPanel) DragMove(); };
@@ -54,7 +59,9 @@ public sealed class SettingsWindow : Window
         var sidebar = new StackPanel { Margin = new Thickness(18, 24, 12, 0) };
         AddNav(sidebar, "appearance", "Appearance", "palette"); AddNav(sidebar, "conversion", "Conversion", "convert");
         AddNav(sidebar, "windows", "Windows", "keyboard"); AddNav(sidebar, "engines", "Converters", "download"); AddNav(sidebar, "about", "About", "info");
-        Grid.SetRow(sidebar, 1); root.Children.Add(sidebar);
+        var navigationScroll = new ScrollViewer { Content = sidebar, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        Grid.SetRow(navigationScroll, 1);
+        root.Children.Add(navigationScroll);
         var scroll = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(10, 24, 30, 0) };
         Grid.SetColumn(scroll, 1); Grid.SetRow(scroll, 1); root.Children.Add(scroll);
         var footer = new DockPanel { Margin = new Thickness(24, 14, 24, 18) };
@@ -117,7 +124,7 @@ public sealed class SettingsWindow : Window
     {
         var content = Section("Keep the original.", "Every conversion creates a separate file. Existing filenames get a numbered suffix.");
         var card = new StackPanel(); card.Children.Add(Ui.Text("Save converted files", 15, weight: FontWeights.SemiBold));
-        var hint = Ui.Text("Blank saves beside the original.", 12, "Muted"); hint.Margin = new Thickness(0, 7, 0, 12); card.Children.Add(hint);
+        var hint = Ui.Text("These defaults apply when you open the popup’s options. A quick conversion saves beside the original.", 12, "Muted"); hint.Margin = new Thickness(0, 7, 0, 12); card.Children.Add(hint);
         Detach(folder); var browse = Ui.IconButton("folder", "Choose output folder", (_, _) => { var dialog = new OpenFolderDialog(); if (dialog.ShowDialog(this) == true) folder.Text = dialog.FolderName; });
         card.Children.Add(FieldRow(folder, browse)); content.Children.Add(Ui.Card(card));
         var image = new StackPanel { Margin = new Thickness(0, 18, 0, 0) };
@@ -154,7 +161,7 @@ public sealed class SettingsWindow : Window
     private Border EngineCard(string name, bool ready, string description, TextBox box, string executable, string url)
     {
         var panel = new StackPanel();
-        panel.Children.Add(Ui.Text(name + (ready ? "  ·  Available" : "  ·  Not installed"), 16, weight: FontWeights.SemiBold));
+        panel.Children.Add(Ui.Text(name + (ready ? "  ·  Found" : "  ·  Not found"), 16, weight: FontWeights.SemiBold));
         var copy = Ui.Text(description, 12, "Muted"); copy.Margin = new Thickness(0, 8, 0, 14); panel.Children.Add(copy);
         Detach(box); panel.Children.Add(FieldRow(box, Ui.IconButton("folder", "Choose " + executable, (_, _) =>
         {
@@ -166,7 +173,8 @@ public sealed class SettingsWindow : Window
     }
     private UIElement AboutPage()
     {
-        var content = Section("Useful. Quiet. Yours.", "Konvert 0.2 alpha · by Shardapps");
+        var version = typeof(SettingsWindow).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0];
+        var content = Section("Useful. Quiet. Yours.", $"Konvert {version} · by Shardapps");
         content.Children.Add(Ui.Text("A native Windows file converter with a file-centered popup. No account, uploads, ads or analytics.", 15));
         var detail = Ui.Text("The conversion window exists only when you need it. A separate native listener handles the shortcut through Windows events, without a keyboard recorder or polling loop. Quit the listener from its tray menu to stop all Konvert activity.", 13, "Muted"); detail.Margin = new Thickness(0, 18, 0, 20); content.Children.Add(detail);
         content.Children.Add(Ui.Button("Source code & feedback", "link", (_, _) => OpenUrl("https://github.com/shardapps/Konvert-any")));

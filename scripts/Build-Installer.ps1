@@ -7,15 +7,22 @@ param(
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 if (!$PayloadDirectory) {
-    & (Join-Path $PSScriptRoot 'Build.ps1') -Runtime "win-$Architecture" -SelfContained -Dotnet $Dotnet
-    $PayloadDirectory=Join-Path $root "artifacts/win-$Architecture-standalone"
+    & (Join-Path $PSScriptRoot 'Build.ps1') -Runtime "win-$Architecture" -Dotnet $Dotnet
+    $PayloadDirectory=Join-Path $root "artifacts/win-$Architecture-compact"
 }
 $PayloadDirectory=(Resolve-Path -LiteralPath $PayloadDirectory).Path
-foreach ($required in @('Konvert.exe','Konvert.dll','KonvertHost.exe','hostfxr.dll','licenses')) {
-    if (!(Test-Path -LiteralPath (Join-Path $PayloadDirectory $required))) { throw "Installer payload missing $required. Use a complete self-contained build." }
+foreach ($required in @('Konvert.exe','Konvert.dll','KonvertHost.exe','Konvert.runtimeconfig.json','Konvert.deps.json',
+    'LICENSE','NOTICE','PRIVACY.md','THIRD_PARTY_NOTICES.md')) {
+    if (!(Test-Path -LiteralPath (Join-Path $PayloadDirectory $required))) { throw "Installer payload missing $required." }
 }
+$runtime = (Get-Content (Join-Path $PayloadDirectory 'Konvert.runtimeconfig.json') -Raw | ConvertFrom-Json).runtimeOptions.frameworks |
+    Where-Object name -eq 'Microsoft.WindowsDesktop.App' | Select-Object -First 1
+if (!$runtime -or (Test-Path -LiteralPath (Join-Path $PayloadDirectory 'hostfxr.dll'))) { throw 'Setup requires a framework-dependent Windows Desktop payload.' }
+$runtimeVersion = ([version]$runtime.version).ToString(2)
+$version = ([xml](Get-Content (Join-Path $root 'Directory.Build.props') -Raw)).Project.PropertyGroup.Version
+$fileVersion = ([version]($version.Split('-')[0])).ToString(3) + '.0'
 $expectedMachine=if($Architecture -eq 'arm64'){0xAA64}else{0x8664}
-foreach ($name in @('Konvert.exe','KonvertHost.exe','hostfxr.dll','coreclr.dll')) {
+foreach ($name in @('Konvert.exe','KonvertHost.exe')) {
     $stream=[IO.File]::OpenRead((Join-Path $PayloadDirectory $name))
     $reader=[IO.BinaryReader]::new($stream)
     try {
@@ -31,6 +38,6 @@ if (!$Iscc) {
 if (!$Iscc) { throw 'Install Inno Setup 6 or pass -Iscc.' }
 $output=Join-Path $root 'artifacts/installers'
 New-Item -ItemType Directory -Force -Path $output | Out-Null
-& $Iscc "/DPayloadDirectory=$PayloadDirectory" "/DTargetArchitecture=$Architecture" '/DAppVersion=0.2.0-alpha.1' "/O$output" (Join-Path $root 'packaging/Konvert.iss')
+& $Iscc "/DPayloadDirectory=$PayloadDirectory" "/DTargetArchitecture=$Architecture" "/DAppVersion=$version" "/DFileVersion=$fileVersion" "/DRuntimeVersion=$runtimeVersion" "/O$output" (Join-Path $root 'packaging/Konvert.iss')
 if ($LASTEXITCODE) { throw 'Installer compilation failed.' }
-Write-Output "Installer: $output/Konvert-Setup-0.2.0-alpha.1-$Architecture.exe"
+Write-Output "Installer: $output/Konvert-Setup-$version-$Architecture.exe"

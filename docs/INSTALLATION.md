@@ -1,16 +1,18 @@
 # Installation and removal
 
-Konvert 0.2 alpha targets Windows 11. Choose x64 for Intel/AMD or ARM64 for Windows on Arm. Both setup EXEs include their architecture's .NET Desktop Runtime and native listener. ARM64 is cross-built; physical hardware verification remains pending. GitHub previews are unsigned.
+Konvert targets Windows 11. Choose x64 for Intel/AMD or ARM64 for Windows on Arm. Setup runs a temporary copy of the app to verify the matching [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0). If the runtime cannot start, Setup offers Microsoft's download page before modifying an existing installation. Physical ARM64 testing remains pending. GitHub previews are unsigned.
 
 ## Setup EXE
 
 Run the matching setup from Releases or CI. The default per-user directory is **%LOCALAPPDATA%\\Programs\\Shardapps\\Konvert**, following Screen's Shardapps folder convention. Setup creates a Start menu shortcut, registers uninstall in Windows Settings → Apps, and offers Explorer/PATH integration, startup at sign-in and a desktop shortcut.
 
-The native listener starts after installation. Select one file in Explorer or on the desktop and press Ctrl+K. PATH alone cannot provide a global shortcut: the listener must be running. It registers Ctrl+K only while Explorer/desktop is active and yields it to other applications. The popup opens around the selected item, clamped to the monitor work area. Escape, the dismiss button and clicking outside close an idle popup.
+With Explorer integration or sign-in startup enabled, setup starts the native listener. Select one file in Explorer or on the desktop and press Ctrl+K. Pick a format to save next to the source. Open the chevron for more formats and output settings. Escape collapses the drawer or closes the circle. An outside click dismisses an idle popup.
 
 Windows 11 shows the installer/portable Explorer command under **Show more options**. A modern packaged Explorer extension remains future work. Open a new terminal after PATH changes. The installer prepends its own directory, preserving unrelated PATH entries and removing only a previous entry Konvert recorded owning.
 
-Run setup again for upgrade/repair. Close any visible conversion/settings windows first; setup stops the native listener before replacing files. Converted outputs and local preferences are preserved.
+Close any visible Konvert windows and run the new setup to upgrade or repair. Use the existing Konvert destination. Setup recognizes the standalone 0.2 and compact 0.3 layouts, including copies without an Installed apps entry. It installs the compact app inside `Konvert.App` within that folder and moves the selected Explorer, PATH and startup entries to it. Shortcuts you created yourself can point to `Konvert.App\Konvert.exe`.
+
+After installation, Setup removes exact matches for files shipped with the previous alpha builds. Locally modified files, other documents, and settings in `%LOCALAPPDATA%\Shardapps\Konvert` are preserved. Files from custom builds with different hashes may remain in the old folder. Setup asks for a different location if an unrelated folder is selected.
 
 ## Optional engines
 
@@ -20,7 +22,7 @@ Settings → Converters shows availability, download links and executable path p
 
 ## Portable ZIP
 
-Extract the entire self-contained ZIP and run Konvert.exe. Keep KonvertHost.exe and licenses/ beside it. It starts the shortcut listener when you open the UI. Register Explorer/PATH in Settings → Windows only after placing the folder permanently. Optional sign-in startup is available there as well.
+Extract the entire ZIP and run Konvert.exe. The compact ZIP uses the shared Desktop Runtime. For a self-contained build, use `scripts/Build.ps1 -SelfContained` and keep its license directory with the extracted files. Opening the UI starts the listener. Register Explorer/PATH in Settings → Windows after placing the folder permanently.
 
 ## Uninstall
 

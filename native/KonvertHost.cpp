@@ -39,10 +39,10 @@ std::wstring Quote(const std::wstring& value) {
     return result + L'\"';
 }
 
-std::wstring ApplicationPath() {
+std::wstring OwnPath() {
     std::vector<wchar_t> buffer(32768);
     const DWORD count = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
-    return (std::filesystem::path(std::wstring(buffer.data(), count)).parent_path() / L"Konvert.exe").wstring();
+    return std::wstring(buffer.data(), count);
 }
 
 bool IsExplorer(HWND window) {
@@ -116,7 +116,9 @@ bool SelectedFile(Selection& selection) {
     GetClassNameW(foreground, foregroundClass, 128);
     if (wcscmp(foregroundClass, L"Progman") != 0 && wcscmp(foregroundClass, L"WorkerW") != 0) return false;
     // Desktop selections are exposed separately from ordinary Explorer windows.
-    VARIANT location{}, root{}; location.vt = root.vt = VT_I4; location.lVal = CSIDL_DESKTOP;
+    VARIANT location{}, root{};
+    location.vt = VT_I4;
+    location.lVal = CSIDL_DESKTOP;
     long desktopHandle{};
     ComPtr<IDispatch> desktop;
     if (SUCCEEDED(windows->FindWindowSW(&location, &root, SWC_DESKTOP, &desktopHandle, SWFO_NEEDDISPATCH, &desktop)) && desktop) {
@@ -149,24 +151,47 @@ void CALLBACK ForegroundEvent(HWINEVENTHOOK, DWORD, HWND, LONG, LONG, DWORD, DWO
     PostMessageW(hostWindow, ForegroundChanged, 0, 0);
 }
 
-void Launch(const std::wstring& arguments) {
-    const std::wstring executable = ApplicationPath();
+void Launch(const std::wstring& arguments, bool trackPopup = false) {
+    const auto executable = (std::filesystem::path(OwnPath()).parent_path() / L"Konvert.exe").wstring();
     std::wstring command = Quote(executable) + L" " + arguments;
     STARTUPINFOW startup{sizeof(startup)};
     PROCESS_INFORMATION process{};
     if (CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &process)) {
         CloseHandle(process.hThread);
-        if (popupProcess) CloseHandle(popupProcess);
-        popupProcess = process.hProcess;
+        if (trackPopup) {
+            if (popupProcess) CloseHandle(popupProcess);
+            popupProcess = process.hProcess;
+        } else CloseHandle(process.hProcess);
     } else Notify(L"Konvert.exe could not be opened. Repair or reinstall Konvert.");
 }
 
 void OpenSelection() {
+    if (popupProcess && WaitForSingleObject(popupProcess, 0) == WAIT_TIMEOUT) return;
     Selection selection;
     if (!SelectedFile(selection)) { Notify(L"Select one local file in Explorer or on the desktop, then press Ctrl+K."); return; }
-    if (popupProcess && WaitForSingleObject(popupProcess, 0) == WAIT_TIMEOUT) return;
     Launch(L"--popup --anchor-x " + std::to_wstring(selection.anchor.x) + L" --anchor-y " +
-        std::to_wstring(selection.anchor.y) + L" " + Quote(selection.path));
+        std::to_wstring(selection.anchor.y) + L" " + Quote(selection.path), true);
+}
+
+int StopListener(const std::wstring& expectedPath) {
+    const HWND window = FindWindowExW(HWND_MESSAGE, nullptr, WindowClass, nullptr);
+    if (!window) return 0;
+    DWORD processId{};
+    GetWindowThreadProcessId(window, &processId);
+    HANDLE process = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+    if (!process) return IsWindow(window) ? 2 : 0;
+    std::vector<wchar_t> path(32768);
+    DWORD length = static_cast<DWORD>(path.size());
+    const bool identified = QueryFullProcessImageNameW(process, 0, path.data(), &length) != FALSE;
+    DWORD result = identified ? WAIT_OBJECT_0 : WaitForSingleObject(process, 0);
+    if (identified && _wcsicmp(path.data(), expectedPath.c_str()) == 0) {
+        DWORD currentProcessId{};
+        GetWindowThreadProcessId(window, &currentProcessId);
+        if (currentProcessId == processId) PostMessageW(window, WM_CLOSE, 0, 0);
+        result = WaitForSingleObject(process, 5000);
+    }
+    CloseHandle(process);
+    return result == WAIT_OBJECT_0 ? 0 : 2;
 }
 
 LRESULT CALLBACK WindowProcedure(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
@@ -202,18 +227,17 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     int count{};
     LPWSTR* args = CommandLineToArgvW(GetCommandLineW(), &count);
-    const bool exitRequested = count > 1 && wcscmp(args[1], L"--exit") == 0;
+    if (!args) return 1;
+    const bool stopAt = count > 1 && wcscmp(args[1], L"--stop-at") == 0;
+    const std::filesystem::path stopTarget = stopAt && count == 3 ? args[2] : L"";
+    const bool exitRequested = count == 2 && wcscmp(args[1], L"--exit") == 0;
     const bool selfTest = count > 1 && wcscmp(args[1], L"--self-test") == 0;
     LocalFree(args);
     if (selfTest) return Quote(L"a b\\") == L"\"a b\\\\\"" && Quote(L"x\"y") == L"\"x\\\"y\"" ? 0 : 1;
-    if (exitRequested) {
-        if (HWND window = FindWindowExW(HWND_MESSAGE, nullptr, WindowClass, nullptr)) {
-            DWORD processId{}; GetWindowThreadProcessId(window, &processId);
-            HANDLE process = OpenProcess(SYNCHRONIZE, FALSE, processId);
-            PostMessageW(window, WM_CLOSE, 0, 0);
-            if (process) { const DWORD result = WaitForSingleObject(process, 5000); CloseHandle(process); if (result == WAIT_TIMEOUT) return 2; }
-        }
-        return 0;
+    if (exitRequested) return StopListener(OwnPath());
+    if (stopAt) {
+        if (!stopTarget.is_absolute() || _wcsicmp(stopTarget.filename().c_str(), L"KonvertHost.exe") != 0) return 1;
+        return StopListener(stopTarget.lexically_normal().wstring());
     }
     HANDLE mutex = CreateMutexW(nullptr, TRUE, L"Local\\Shardapps.Konvert.HotkeyHost");
     if (!mutex || GetLastError() == ERROR_ALREADY_EXISTS) { if (mutex) CloseHandle(mutex); return 0; }
