@@ -65,11 +65,13 @@ function Invoke-Setup {
 }
 
 function Remove-TestInstall([string]$Target) {
+    # Inno can leave the self-deleting uninstaller briefly after the registration is gone.
+    $registeredPath = Read-RegistryValue $registeredKey 'InstallLocation'
+    if (!$registeredPath -or [IO.Path]::GetFullPath($registeredPath).TrimEnd('\') -ne $Target.TrimEnd('\')) { return }
     $uninstall = Join-Path $Target 'unins000.exe'
-    if (Test-Path -LiteralPath $uninstall) {
-        $code = Invoke-Process $uninstall '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART'
-        if ($code) { throw "Uninstall failed with code $code." }
-    }
+    $log = Join-Path $scratch ([Guid]::NewGuid().ToString('N') + '-uninstall.log')
+    $code = Invoke-Process $uninstall ('/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG="' + $log + '"')
+    if ($code) { throw "Uninstall failed with code $code. See $log." }
 }
 
 function Test-CompactInstall([string]$Target) {
