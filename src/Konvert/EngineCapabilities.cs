@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Globalization;
 using System.Text.Json;
 
 namespace Konvert;
@@ -10,11 +11,29 @@ public sealed record EngineCapabilities(string? LibreOffice, string? Ffmpeg, IRe
     public bool? HasVideo { get; init; }
     internal IReadOnlySet<string>? Muxers { get; init; }
     internal bool HasWindowsImageCodec { get; init; }
+    internal string? PdfRenderer { get; init; }
+    internal int? PdfPageCount { get; init; }
+    internal bool PdfRenderFailed { get; init; }
 
     public static async Task<EngineCapabilities> DetectAsync(
         ConversionSettings settings, CancellationToken cancellationToken = default, string? source = null)
     {
         var installed = Locate(settings, source);
+        if (source is not null && installed.PdfRenderer is { } renderer)
+        {
+            try
+            {
+                var info = await ExternalProcess.RunAsync(renderer, ["--info", Path.GetFullPath(source)],
+                    TimeSpan.FromSeconds(8), cancellationToken);
+                if (int.TryParse(info.StandardOutput.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var pages) && pages > 0)
+                    installed = installed with { PdfPageCount = pages };
+            }
+            catch (Exception ex) when (ProbeFailed(ex) && ex is not TimeoutException)
+            {
+                installed = installed with { PdfRenderFailed = true };
+            }
+            catch (TimeoutException) { /* Allow an explicit conversion to wait for a streamed file. */ }
+        }
         if (source is not null && FormatRegistry.Uses(source, ConversionBackend.WindowsImage))
         {
             var supported = await Task.Run(() => ImageConverter.CanDecode(source), cancellationToken);
@@ -79,7 +98,11 @@ public sealed record EngineCapabilities(string? LibreOffice, string? Ffmpeg, IRe
         var ffmpeg = source is null || FormatRegistry.Uses(source, ConversionBackend.Media)
             ? Resolve(settings.FfmpegPath, "ffmpeg.exe")
             : null;
-        return new(office, ffmpeg, FrozenSet<string>.Empty);
+        var pdf = Path.Combine(AppContext.BaseDirectory, "KonvertPdf.exe");
+        return new(office, ffmpeg, FrozenSet<string>.Empty)
+        {
+            PdfRenderer = source is not null && FormatRegistry.SourceExtension(source) == "pdf" && File.Exists(pdf) ? pdf : null
+        };
     }
 
     private static bool ProbeFailed(Exception ex) =>

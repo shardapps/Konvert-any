@@ -6,7 +6,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.Win32;
-using Ellipse = System.Windows.Shapes.Ellipse;
 
 namespace Konvert;
 
@@ -170,28 +169,42 @@ public sealed class SettingsWindow : Window
 
     private static Border ThemeSwatch(AppTheme theme)
     {
-        var rings = new Canvas { Width = 66, Height = 60, HorizontalAlignment = HorizontalAlignment.Center };
-        var outline = ThemeManager.Brush(theme.Outline);
         var accent = ThemeManager.Brush(theme.Accent);
-        AddDot(33, 30, 53, ThemeManager.Brush(theme.Chrome), outline);
-        var button = ThemeManager.Brush(theme.Raised);
-        AddDot(33, 12, 12, button, outline);
-        AddDot(15, 30, 12, button, outline);
-        AddDot(51, 30, 12, button, outline);
-        AddDot(33, 30, 20, ThemeManager.Brush(theme.Surface), accent);
-        var icon = new IconControl { Kind = "convert", Ink = accent, Width = 12, Height = 12 };
-        Canvas.SetLeft(icon, 27);
-        Canvas.SetTop(icon, 24);
-        rings.Children.Add(icon);
-        return new Border { Background = ThemeManager.Brush(theme.Raised), CornerRadius = new CornerRadius(12), Child = rings };
-
-        void AddDot(double x, double y, double size, Brush fill, Brush stroke)
+        var card = new StackPanel { Width = 66, Height = 46, Margin = new Thickness(4) };
+        var title = new DockPanel { Margin = new Thickness(0, 0, 0, 5) };
+        title.Children.Add(new IconControl { Kind = "convert", Ink = accent, Width = 12, Height = 12 });
+        title.Children.Add(new Border
         {
-            var dot = new Ellipse { Width = size, Height = size, Fill = fill, Stroke = stroke };
-            Canvas.SetLeft(dot, x - size / 2);
-            Canvas.SetTop(dot, y - size / 2);
-            rings.Children.Add(dot);
+            Height = 3,
+            Margin = new Thickness(5, 0, 12, 0),
+            CornerRadius = new CornerRadius(1.5),
+            Background = ThemeManager.Brush(theme.Ink)
+        });
+        card.Children.Add(title);
+        var formats = new System.Windows.Controls.Primitives.UniformGrid { Rows = 1 };
+        for (var index = 0; index < 3; index++)
+        {
+            formats.Children.Add(new Border
+            {
+                Height = 15,
+                Margin = new Thickness(0, 0, 3, 0),
+                CornerRadius = new CornerRadius(4),
+                Background = ThemeManager.Brush(theme.Raised),
+                BorderThickness = new Thickness(1),
+                BorderBrush = index == 0 ? accent : ThemeManager.Brush(theme.Outline)
+            });
         }
+        card.Children.Add(formats);
+        return new Border
+        {
+            Background = ThemeManager.Brush(theme.Chrome),
+            CornerRadius = new CornerRadius(10),
+            BorderBrush = ThemeManager.Brush(theme.Outline),
+            BorderThickness = new Thickness(1),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Padding = new Thickness(2, 6, 0, 0),
+            Child = card
+        };
     }
     private UIElement ConversionPage()
     {

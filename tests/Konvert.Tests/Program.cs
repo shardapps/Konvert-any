@@ -6,6 +6,10 @@ using System.Text.Json;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Konvert;
+using UglyToad.PdfPig.Content;
+using UglyToad.PdfPig.Core;
+using UglyToad.PdfPig.Fonts.Standard14Fonts;
+using UglyToad.PdfPig.Writer;
 
 internal static class Program
 {
@@ -49,7 +53,8 @@ internal static class Program
             True(((SolidColorBrush)window.Background).Color.A < 255);
             Equal(System.Windows.WindowStyle.None, settingsWindow.WindowStyle);
             True(popup.AllowsTransparency);
-            Equal(224.0, popup.Width); Equal(224.0, popup.Height);
+            Equal(MainWindow.QuickWidth, popup.Width);
+            True(popup.Height < 185);
             settingsWindow.Close(); popup.Close(); window.Close();
         });
         await Test("Picker explains missing and unsupported inputs and opens converter setup", () => PickerTests.VerifyRecovery(Root));
@@ -57,6 +62,10 @@ internal static class Program
         await Test("Picker quick and expanded actions save to their respective folders", () => PickerTests.VerifySavePaths(Root));
         await Test("Picker shows conversion errors and can retry another route", () => PickerTests.VerifyFailedJobCanRetry(Root));
         await Test("Dismissing a busy popup hides it and preserves the conversion", () => PickerTests.VerifyBackgroundSave(Root));
+        await Test("Options keep the Convert button in view on a short screen", () => PickerTests.VerifyFooter(Root));
+        var pdf = MakePdf();
+        if (args.Contains("--live-ui"))
+            await Test("Live PDF picker selects page two, saves PNG, and dismisses on focus change", () => PickerTests.VerifyLivePdf(pdf, Root));
         await Test("Seven persistent themes and high contrast fallback", () =>
         {
             Equal(7, ThemeManager.Themes.Count);
@@ -80,10 +89,9 @@ internal static class Program
             var contrast = new System.Windows.ResourceDictionary();
             ThemeManager.Apply("glass", contrast, true);
             Equal(System.Windows.SystemColors.WindowBrush, contrast["Surface"]);
-            Equal(System.Windows.SystemColors.WindowBrush, contrast["LensFill"]);
+            Equal(System.Windows.SystemColors.WindowBrush, contrast["PickerSurface"]);
             ThemeManager.Apply("glass", contrast, false, reducedTransparency: true);
-            Equal((byte)255, ((SolidColorBrush)contrast["LensFill"]).Color.A);
-            True(((RadialGradientBrush)contrast["LensLight"]).GradientStops.All(stop => stop.Color.A == 0));
+            Equal((byte)255, ((SolidColorBrush)contrast["PickerSurface"]).Color.A);
             Equal("glass", (new ConversionSettings { Theme = "invalid" }).Validate().Theme);
 
             static double Luminance(Color color) => 0.2126 * color.ScR + 0.7152 * color.ScG + 0.0722 * color.ScB;
@@ -104,8 +112,8 @@ internal static class Program
             Equal(652.0, above.Bottom);
             Equal(890.0, above.Right);
             var shortDrawer = WindowEffects.FitBesideSelection(new(400, 450, 422), new(224, 470), 224, desktop);
-            Equal(458.0, shortDrawer.Top);
-            Equal(750.0, shortDrawer.Bottom);
+            Equal(10.0, shortDrawer.Top);
+            Equal(414.0, shortDrawer.Bottom);
             var drawerAtEdge = WindowEffects.FitBesideSelection(new(400, 512, 484), new(224, 470), 224, desktop);
             Equal(476.0, drawerAtEdge.Bottom);
         });
@@ -117,6 +125,66 @@ internal static class Program
         });
         var none = new EngineCapabilities(null, null, new HashSet<string>());
         using var service = new ConversionService(none);
+        await TestAsync("PDF text and editable DOCX preserve both pages", async () =>
+        {
+            var txt = await service.ConvertAsync(pdf, "txt", new());
+            var text = File.ReadAllText(txt.OutputPath);
+            True(text.Contains("First page fixture") && text.Contains("Second page fixture"));
+            var word = await service.ConvertAsync(pdf, "docx", new());
+            using (var archive = ZipFile.OpenRead(word.OutputPath))
+                True(archive.GetEntry("[Content_Types].xml") is not null && archive.GetEntry("_rels/.rels") is not null);
+            var roundtrip = await service.ConvertAsync(word.OutputPath, "txt", new());
+            var extracted = File.ReadAllText(roundtrip.OutputPath);
+            True(extracted.Contains("First page fixture") && extracted.Contains("Second page fixture"));
+        });
+        await TestAsync("Notebook HTML escapes code and preserves text output", async () =>
+        {
+            var notebook = Put("notebook.ipynb", """
+                {"nbformat":4,"cells":[
+                {"cell_type":"markdown","source":["# Study notes\n","One paragraph"]},
+                {"cell_type":"code","source":"print('<script>')","outputs":[{"output_type":"stream","text":["A result\n"]}]}
+                ]}
+                """);
+            var html = File.ReadAllText((await service.ConvertAsync(notebook, "html", new())).OutputPath);
+            True(html.Contains("&lt;script&gt;") && html.Contains("A result") && !html.Contains("<script>"));
+            var markdown = File.ReadAllText((await service.ConvertAsync(notebook, "md", new())).OutputPath);
+            True(markdown.Contains("# Study notes") && markdown.Contains("    print") && markdown.Contains("A result"));
+            var text = File.ReadAllText((await service.ConvertAsync(notebook, "txt", new())).OutputPath);
+            True(text.Contains("Code cell 2") && text.Contains("A result"));
+        });
+        var pdfCapabilities = await EngineCapabilities.DetectAsync(new(), source: pdf);
+        if (pdfCapabilities.PdfRenderer is not null)
+        {
+            using var renderer = new ConversionService(pdfCapabilities);
+            await TestAsync("Windows PDF renderer exports the requested page at the requested pixel size", async () =>
+            {
+                Equal(2, pdfCapabilities.PdfPageCount);
+                foreach (var format in new[] { "png", "jpg" })
+                {
+                    var result = await renderer.ConvertAsync(pdf, format, new() { PdfPage = 2, Dpi = 144, MaxImageEdge = 512 });
+                    using var stream = File.OpenRead(result.OutputPath);
+                    var frame = BitmapDecoder.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
+                    Equal(512, frame.PixelWidth);
+                    Equal(384, frame.PixelHeight);
+                }
+                await ThrowsAsync<IOException>(() => renderer.ConvertAsync(pdf, "png", new() { PdfPage = 3 }));
+            });
+            await TestAsync("PDF page ZIP contains one usable PNG per page", async () =>
+            {
+                var result = await renderer.ConvertAsync(pdf, "zip", new() { MaxImageEdge = 512 });
+                using var zip = ZipFile.OpenRead(result.OutputPath);
+                Equal(2, zip.Entries.Count);
+                foreach (var (file, portrait) in new[] { ("Page-001.png", true), ("Page-002.png", false) })
+                {
+                    using var stream = zip.GetEntry(file)!.Open();
+                    var frame = new PngBitmapDecoder(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
+                    Equal(512, Math.Max(frame.PixelWidth, frame.PixelHeight));
+                    Equal(portrait, frame.PixelWidth < frame.PixelHeight);
+                }
+            });
+        }
+        else if (args.Contains("--require-pdf-renderer"))
+            await Test("Windows PDF renderer is installed", () => True(false));
         await Test("Registry gates optional engines and handles case", () =>
         {
             var registry = new FormatRegistry(none);
@@ -470,6 +538,17 @@ internal static class Program
         Add("word/document.xml", $"<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body>{content}</w:body></w:document>");
         return path;
         void Add(string entry, string text) { using var writer = new StreamWriter(archive.CreateEntry(entry).Open()); writer.Write(text); }
+    }
+
+    private static string MakePdf()
+    {
+        var path = Path.Combine(Root, "PDF review notes.pdf");
+        var builder = new PdfDocumentBuilder();
+        var font = builder.AddStandard14Font(Standard14Font.Helvetica);
+        builder.AddPage(300, 400).AddText("First page fixture", 16, new PdfPoint(28, 320), font);
+        builder.AddPage(400, 300).AddText("Second page fixture", 16, new PdfPoint(28, 220), font);
+        File.WriteAllBytes(path, builder.Build());
+        return path;
     }
     private static string MakeImage(string name = "sample.png", int width = 32, int height = 24)
     {

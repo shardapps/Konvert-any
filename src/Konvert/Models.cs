@@ -7,6 +7,7 @@ public sealed record ConversionTarget(string Extension, string Label, string Det
     public bool SupportsJpegQuality { get; init; }
     public bool SupportsDpi { get; init; }
     public bool SupportsImageSize { get; init; }
+    public bool SupportsPdfPage { get; init; }
 }
 public sealed record ConversionOption(ConversionTarget Target, bool Available)
 {
@@ -18,6 +19,7 @@ public sealed record ConversionSettings
     public int JpegQuality { get; init; } = 90;
     public int Dpi { get; init; } = 144;
     public int MaxImageEdge { get; init; }
+    public int PdfPage { get; init; } = 1;
     public string? OutputDirectory { get; init; }
     public string? LibreOfficePath { get; init; }
     public string? FfmpegPath { get; init; }
@@ -30,6 +32,7 @@ public sealed record ConversionSettings
         JpegQuality = Math.Clamp(JpegQuality, 10, 100),
         Dpi = Math.Clamp(Dpi, 72, 600),
         MaxImageEdge = MaxImageEdge <= 0 ? 0 : Math.Clamp(MaxImageEdge, 64, 3840),
+        PdfPage = Math.Clamp(PdfPage, 1, 10_000),
         Theme = ThemeManager.Themes.Any(theme => theme.Id == Theme) ? Theme : "glass",
         OutputDirectory = string.IsNullOrWhiteSpace(OutputDirectory) ? null : Path.GetFullPath(OutputDirectory)
     };

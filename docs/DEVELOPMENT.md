@@ -1,6 +1,6 @@
 # Development
 
-Use Windows 11, Git and the .NET 10 SDK. The native listener also requires Visual Studio C++ desktop tools and the Windows SDK; setup EXEs require Inno Setup 6. `global.json` permits the latest installed .NET 10 feature band. No additional NuGet packages are required by the app or test harness.
+Use Windows 11, Git and the .NET 10 SDK. The native listener and PDF renderer require Visual Studio C++ desktop tools and the Windows SDK; setup EXEs require Inno Setup 6. `global.json` permits the latest installed .NET 10 feature band. NuGet restores PdfPig for built-in PDF text extraction.
 
 ```powershell
 git clone https://github.com/shardapps/Konvert-any.git
@@ -12,6 +12,17 @@ dotnet run --project src/Konvert
 ```
 
 Use `dotnet format Konvert.sln` to apply formatting. The executable regression harness intentionally avoids a test framework dependency. Run it explicitly; `dotnet test` is not the verification entry point. Fixtures are generated in a unique Windows temp directory and removed afterward.
+
+## Native PDF and desktop tests
+
+```powershell
+dotnet build Konvert.sln -c Release
+./scripts/Build-NativeHost.ps1 -Architecture x64
+Copy-Item artifacts/native-x64/KonvertPdf.exe tests/Konvert.Tests/bin/Release/net10.0-windows/
+dotnet run --project tests/Konvert.Tests -c Release --no-build -- --require-pdf-renderer
+```
+
+Add `--live-ui` in an interactive Windows session to open the picker, export a selected PDF page, and verify dismissal when focus moves to another window.
 
 ## Optional integration tests
 
@@ -33,7 +44,7 @@ The engine suite converts generated audio/video and decodes results using FFmpeg
 ./scripts/Build-Msix.ps1 -Architecture x64 -IdentityName Shardapps.Konvert.Development -Publisher CN=Shardapps.Development
 ```
 
-Build outputs go to ignored `artifacts/`. Setup contains the compact app, listener and notices. The installer builder verifies the apphost and listener PE architecture for x64 or ARM64. Windows CI runs fresh install, repair, upgrade from a rebuilt 0.2 standalone installer, recovery from an orphaned legacy folder, and removal on a disposable x64 account. ARM64 is cross-built and requires physical-device validation. Compact installers and ZIPs use .NET 10 Desktop Runtime. Standalone ZIPs and MSIX include it. MSIX needs the Windows SDK's MakeAppx and an explicit publisher and identity. Use Partner Center values for Store work.
+Build outputs go to ignored `artifacts/`. Setup contains the compact app, listener, PDF renderer and notices. The installer builder verifies the apphost, listener and PDF renderer PE architectures for x64 or ARM64. Windows CI runs fresh install, repair, upgrade from a rebuilt 0.2 standalone installer, recovery from an orphaned legacy folder, and removal on a disposable x64 account. ARM64 is cross-built and requires physical-device validation. Compact installers and ZIPs use .NET 10 Desktop Runtime. Standalone ZIPs and MSIX include it. MSIX needs the Windows SDK's MakeAppx and an explicit publisher and identity. Use Partner Center values for Store work.
 
 For a development Ctrl+K listener, build with `./scripts/Build-NativeHost.ps1 -Architecture x64 -Output src/Konvert/bin/Release/net10.0-windows` after the managed build. Use the finished package for installed-flow testing. The listener has `--self-test` and `--exit` commands; closing the conversion UI leaves the separately controlled listener active.
 
@@ -41,6 +52,6 @@ For a workspace on a streamed/cloud filesystem, Windows apphost resource updates
 
 ## CI provenance
 
-The CI/CD Pipeline Builder skill's detector has no `.csproj` support, so the Windows workflow uses the solution and checked-in build scripts as its stack inputs. The build, format, regression and engine jobs gate the x64 and ARM64 package matrix. The matrix publishes the app without repeating the already completed regression suite. The x64 installer check runs before artifact upload and retains setup logs on failure. The setup EXEs have separate download artifacts from the portable ZIP and MSIX bundles. CodeQL scans C# and the C++ listener. The app has no third-party NuGet dependencies or package lockfiles, and the workflow uses SHA-pinned actions.
+The CI/CD Pipeline Builder skill's detector has no `.csproj` support, so the Windows workflow uses the solution and checked-in build scripts as its stack inputs. The build, format, regression and engine jobs gate the x64 and ARM64 package matrix. The matrix publishes the app without repeating the already completed regression suite. The x64 installer check runs before artifact upload and retains setup logs on failure. The setup EXEs have separate download artifacts from the portable ZIP and MSIX bundles. CodeQL scans C# and the C++ listener. The workflow audits NuGet dependencies and uses SHA-pinned actions.
 
 Keep all changes on branches and PRs. Merge only when checks for the current head pass. No deployment secrets are required for CI. Store credentials/signing are deliberately absent; future deployment must use a protected environment with human release approval.

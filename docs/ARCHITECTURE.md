@@ -6,7 +6,7 @@ Konvert separates the persistent shortcut from the transient conversion UI.
 flowchart LR
     A[Explorer / desktop foreground event] --> B[Native C++ listener]
     B -->|Ctrl+K: query selected file| C[Windows Shell COM]
-    C --> D[Transient WPF radial popup]
+    C --> D[Transient WPF format picker]
     E[Explorer command / file arguments / chooser] --> D
     D --> F[Format registry and converter availability]
     F --> G[One heavy conversion per process]
@@ -23,7 +23,7 @@ The listener sleeps in GetMessage when idle. It exposes tray open/settings/pause
 
 ## UI and themes
 
-The managed application is .NET 10/WPF with software rendering. A file argument opens a 224 DIP popup. With no file it shows a compact picker. The shortcut anchors the circle to the selected item and keeps it inside the monitor work area. A temporary click watcher dismisses the visible file popup. An active export continues while hidden, then the UI process exits.
+The managed application is .NET 10/WPF with software rendering. A file argument opens a 264 DIP picker. Options use a 308 DIP view with scrollable settings and a fixed action. The shortcut anchors the picker to the selected item within the monitor work area. A temporary click watcher dismisses the visible popup. An active export continues while hidden, then the UI process exits.
 
 The conversion catalog maps each supported source and destination to a provider. Route availability and execution use the same definitions, including required media encoders. Conversion work leaves the UI thread before opening files. Image decoding uses an STA worker, CSV/TSV parsing streams through a reader, and external processes run asynchronously with bounded diagnostics.
 

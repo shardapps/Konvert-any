@@ -70,11 +70,12 @@ public partial class App : Application
         {
             if (args[0] == "--help")
             {
-                Console.WriteLine("Konvert | --formats <file> | --convert <file> --to <format> [--output <folder>]\nPass a file to open its radial popup. Ctrl+K works in Explorer with KonvertHost running. --settings opens preferences. Existing files are never overwritten.");
+                Console.WriteLine("Konvert | --formats <file> | --convert <file> --to <format> [--output <folder>] [--page <number>] [--dpi <number>]\nPass a file to open the picker. Ctrl+K works in Explorer with KonvertHost running. --settings opens preferences.");
                 return 0;
             }
             if (args.Length < 2) throw new ArgumentException("Supply an input file.");
-            var settings = new SettingsStore().Load();
+            if (!File.Exists(args[1])) throw new FileNotFoundException("The source file is unavailable.");
+            var settings = new SettingsStore().Load() with { PdfPage = 1 };
             var capabilities = await EngineCapabilities.DetectAsync(settings, source: args[1]);
             if (args[0] == "--formats")
             {
@@ -89,6 +90,8 @@ public partial class App : Application
                 {
                     case "--to": target = args[i + 1]; break;
                     case "--output": settings = settings with { OutputDirectory = args[i + 1] }; break;
+                    case "--page": settings = settings with { PdfPage = ReadNumber(args[i + 1], 1, 10_000, "Page") }; break;
+                    case "--dpi": settings = settings with { Dpi = ReadNumber(args[i + 1], 72, 600, "DPI") }; break;
                     default: throw new ArgumentException($"Unknown option: {args[i]}");
                 }
             }
@@ -98,6 +101,13 @@ public partial class App : Application
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex.Message); return 1; }
+    }
+
+    private static int ReadNumber(string text, int minimum, int maximum, string name)
+    {
+        if (int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var value)
+            && value >= minimum && value <= maximum) return value;
+        throw new ArgumentException($"{name} must be between {minimum} and {maximum}.");
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]

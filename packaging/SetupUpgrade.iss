@@ -110,6 +110,7 @@ var
   Previous: String;
 begin
   ExtractTemporaryFiles('{tmp}\Konvert.*');
+  ExtractTemporaryFiles('{tmp}\UglyToad.PdfPig*.dll');
   // The packaged executable verifies its actual runtime resolution, including architecture.
   Previous := GetEnv('DOTNET_DISABLE_GUI_ERRORS');
   SetEnvironmentVariable('DOTNET_DISABLE_GUI_ERRORS', '1');

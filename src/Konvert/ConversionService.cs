@@ -46,6 +46,15 @@ public sealed class ConversionService(EngineCapabilities capabilities) : IDispos
                 case ConversionBackend.Text:
                     TextConverter.Convert(input, staging, source, extension, cancellationToken);
                     break;
+                case ConversionBackend.Notebook:
+                    NotebookConverter.Convert(input, staging, extension, cancellationToken);
+                    break;
+                case ConversionBackend.PdfText:
+                    PdfConverter.Extract(input, staging, extension, cancellationToken);
+                    break;
+                case ConversionBackend.PdfImage:
+                    await ConvertPdfImagesAsync(input, staging, extension, settings, cancellationToken);
+                    break;
             }
             cancellationToken.ThrowIfCancellationRequested();
             if (!File.Exists(staging) || new FileInfo(staging).Length == 0 && extension != "txt")
@@ -63,6 +72,44 @@ public sealed class ConversionService(EngineCapabilities capabilities) : IDispos
             gate.Release();
         }
     }
+
+    private async Task ConvertPdfImagesAsync(string input, string output, string target, ConversionSettings settings, CancellationToken token)
+    {
+        PdfConverter.CheckSize(input);
+        if (target == "png")
+        {
+            await RenderPdfAsync(input, output, settings.PdfPage, settings, token);
+            return;
+        }
+
+        var workspace = Directory.CreateTempSubdirectory("Konvert-pdf-");
+        try
+        {
+            if (target == "zip")
+            {
+                await RenderPdfAsync(input, workspace.FullName, 0, settings, token);
+                await System.IO.Compression.ZipFile.CreateFromDirectoryAsync(workspace.FullName, output,
+                    System.IO.Compression.CompressionLevel.NoCompression, includeBaseDirectory: false, cancellationToken: token);
+            }
+            else
+            {
+                var png = Path.Combine(workspace.FullName, "page.png");
+                await RenderPdfAsync(input, png, settings.PdfPage, settings, token);
+                await RunStaAsync(() => ImageConverter.Convert(png, output, "jpg", settings with { MaxImageEdge = 0 }, token), token);
+            }
+        }
+        finally
+        {
+            try { workspace.Delete(true); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
+    }
+
+    private Task<ExternalProcess.Output> RenderPdfAsync(string input, string output, int page, ConversionSettings settings, CancellationToken token) =>
+        ExternalProcess.RunAsync(capabilities.PdfRenderer!, ["--render", input, output,
+            page.ToString(CultureInfo.InvariantCulture), settings.Dpi.ToString(CultureInfo.InvariantCulture),
+            settings.MaxImageEdge.ToString(CultureInfo.InvariantCulture)],
+            page == 0 ? TimeSpan.FromMinutes(3) : TimeSpan.FromSeconds(60), token);
 
     private static string CommitWithoutOverwrite(string staging, string directory, string name, string extension)
     {

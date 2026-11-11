@@ -20,7 +20,9 @@ try {
     if ($LASTEXITCODE) { throw 'Publish failed.' }
     $architecture=$Runtime.Replace('win-','')
     & (Join-Path $PSScriptRoot 'Build-NativeHost.ps1') -Architecture $architecture -Output (Join-Path $root "artifacts/native-$architecture")
-    Copy-Item (Join-Path $root "artifacts/native-$architecture/KonvertHost.exe") -Destination $output -Force
+    foreach ($name in 'KonvertHost.exe','KonvertPdf.exe') {
+        Copy-Item (Join-Path $root "artifacts/native-$architecture/$name") -Destination $output -Force
+    }
     if ($SelfContained) { & (Join-Path $PSScriptRoot 'Copy-RuntimeNotices.ps1') -Destination $output -Runtime $Runtime -Dotnet $Dotnet }
     Copy-Item LICENSE,NOTICE,PRIVACY.md,THIRD_PARTY_NOTICES.md -Destination $output
     Compress-Archive -Path "$output/*" -DestinationPath "$output.zip" -Force
