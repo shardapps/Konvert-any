@@ -74,9 +74,30 @@ function Remove-TestInstall([string]$Target) {
     if ($code) { throw "Uninstall failed with code $code. See $log." }
 }
 
+function New-InstallerPdf([string]$Path) {
+    $pageText = 'BT /F1 16 Tf 24 150 Td (Installer PDF check) Tj ET'
+    $objects = @(
+        '<< /Type /Catalog /Pages 2 0 R >>',
+        '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 220 200] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+        ("<< /Length " + $pageText.Length + " >>`nstream`n" + $pageText + "`nendstream"),
+        '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
+    )
+    $pdf = [Text.StringBuilder]::new("%PDF-1.4`n")
+    $offsets = for ($index = 0; $index -lt $objects.Count; $index++) {
+        $pdf.Length
+        [void]$pdf.Append("$($index + 1) 0 obj`n$($objects[$index])`nendobj`n")
+    }
+    $xref = $pdf.Length
+    [void]$pdf.Append("xref`n0 6`n0000000000 65535 f `n")
+    foreach ($offset in $offsets) { [void]$pdf.Append(('{0:D10} 00000 n ' -f $offset) + "`n") }
+    [void]$pdf.Append("trailer`n<< /Size 6 /Root 1 0 R >>`nstartxref`n$xref`n%%EOF`n")
+    [IO.File]::WriteAllText($Path, $pdf.ToString(), [Text.Encoding]::ASCII)
+}
+
 function Test-CompactInstall([string]$Target) {
     $app = Join-Path $Target 'Konvert.App'
-    foreach ($name in @('Konvert.exe','KonvertHost.exe','Konvert.runtimeconfig.json')) {
+    foreach ($name in @('Konvert.exe','KonvertHost.exe','KonvertPdf.exe','UglyToad.PdfPig.dll','Konvert.runtimeconfig.json')) {
         if (!(Test-Path -LiteralPath (Join-Path $app $name))) { throw "Installed payload missing $name." }
     }
     if (Test-Path -LiteralPath (Join-Path $app 'hostfxr.dll')) { throw 'Compact payload contains a private runtime.' }
@@ -89,6 +110,20 @@ function Test-CompactInstall([string]$Target) {
     }
     if ((Get-Content -LiteralPath $result -Raw) -notmatch 'Installer conversion check') {
         throw 'Installed conversion produced invalid HTML.'
+    }
+    $pdf = Join-Path $Target 'installer.pdf'
+    New-InstallerPdf $pdf
+    foreach ($format in 'txt','png') {
+        if (Invoke-Process (Join-Path $app 'Konvert.exe') ('--convert "' + $pdf + '" --to ' + $format) 30000) {
+            throw "Installed PDF to $format conversion failed."
+        }
+    }
+    if ((Get-Content -LiteralPath ([IO.Path]::ChangeExtension($pdf, 'txt')) -Raw) -notmatch 'Installer PDF check') {
+        throw 'Installed PDF text export was unreadable.'
+    }
+    $png = [IO.File]::ReadAllBytes([IO.Path]::ChangeExtension($pdf, 'png'))
+    if ($png.Length -lt 8 -or [Convert]::ToHexString($png, 0, 8) -ne '89504E470D0A1A0A') {
+        throw 'Installed PDF rendering did not produce PNG.'
     }
     return $result
 }

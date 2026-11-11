@@ -6,7 +6,7 @@ Konvert targets Windows 11. Choose x64 for Intel/AMD or ARM64 for Windows on Arm
 
 Run the matching setup from Releases or CI. The default per-user directory is **%LOCALAPPDATA%\\Programs\\Shardapps\\Konvert**, following Screen's Shardapps folder convention. Setup creates a Start menu shortcut, registers uninstall in Windows Settings → Apps, and offers Explorer/PATH integration, startup at sign-in and a desktop shortcut.
 
-With Explorer integration or sign-in startup enabled, setup starts the native listener. Select one file in Explorer or on the desktop and press Ctrl+K. The circle appears below the file when there’s room. Pick a format to save beside the source, or open **Options** for more formats and output settings. Escape closes Options, dismisses the circle, or cancels an active export. An outside click hides the popup and lets an active export finish.
+With Explorer integration or sign-in startup enabled, setup starts the native listener. Select one file in Explorer or on the desktop and press Ctrl+K. The picker appears below the file when there’s room. Pick a format to save beside the source, or open **Options**, choose a format and settings, and select **Convert**. Escape closes Options, dismisses the picker, or cancels an active export. An outside click hides the popup and lets an active export finish.
 
 Windows 11 shows the installer/portable Explorer command under **Show more options**. A modern packaged Explorer extension remains future work. Open a new terminal after PATH changes. The installer prepends its own directory, preserving unrelated PATH entries and removing only a previous entry Konvert recorded owning.
 

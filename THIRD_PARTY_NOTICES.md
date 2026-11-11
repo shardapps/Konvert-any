@@ -1,6 +1,24 @@
 # Third-party notices
 
-Konvert code is Apache-2.0. There are currently no third-party application NuGet dependencies.
+Konvert code is Apache-2.0. PDF text extraction uses [PdfPig 0.1.16](https://github.com/UglyToad/PdfPig/tree/v0.1.16) under Apache-2.0. The license terms are included in `LICENSE`.
+
+The PdfPig upstream notice follows.
+
+```text
+This product is derived from software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+Based on source code originally developed in the PDFBox and
+FontBox projects.
+
+Copyright (c) 2002-2007, www.pdfbox.org
+
+Includes the Adobe Glyph List
+Copyright 1997, 1998, 2002, 2007, 2010 Adobe Systems Incorporated.
+
+Includes the Zapf Dingbats Glyph List
+Copyright 2002, 2010 Adobe Systems Incorporated.
+```
 
 .NET and WPF use upstream licenses including MIT and third-party notices. Compact builds require a separately installed Desktop Runtime. Self-contained builds include runtime license/notice files, which must be preserved. See [dotnet/runtime](https://github.com/dotnet/runtime) and [dotnet/wpf](https://github.com/dotnet/wpf).
 

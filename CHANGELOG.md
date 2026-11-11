@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0-alpha.1
+
+- Replace the fixed wheel with a compact filename-first picker. Options uses one scrollable form with a fixed Convert button. Unsupported files have one short recovery view.
+- Export PDFs to TXT, editable DOCX, selected-page PNG/JPG, or a ZIP of numbered PNG pages. Page rendering uses Windows and keeps output dimensions independent of display scaling.
+- Export Jupyter notebooks to static HTML, Markdown, and text, including textual cell outputs.
+- Exercise the PDF renderer in Windows CI and check installed PDF exports through the setup smoke test.
+
 ## 0.3.3-alpha.1
 
 - Give Glass a more translucent lens with a lit edge, original format icons, and eased entry and drawer transitions. Honor Windows transparency settings and add a Reduce transparency preference.

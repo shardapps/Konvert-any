@@ -11,7 +11,7 @@ public static class ThemeManager
 {
     public static IReadOnlyList<AppTheme> Themes { get; } =
     [
-        new("glass", "Glass", "Clear blue glass · graphite", "#F2182634", "#FF162837", "#FF284457", "#F4F9FD", "#C1D5E5", "#ADEBFF", "#68889C", true),
+        new("glass", "Glass", "Graphite · cool edge", "#F2182634", "#FF172C3A", "#FF253D4C", "#F4F9FD", "#C1D5E5", "#ADEBFF", "#68889C", true),
         new("pearl", "Pearl", "Soft white · cobalt", "#F4F7FB", "#FFFFFF", "#E7EDF7", "#1B2537", "#4C5D73", "#245DD0", "#B6C5D9"),
         new("graphite", "Graphite", "Quiet grey · icy cyan", "#171C22", "#222A33", "#2D3742", "#F1F6FC", "#B7C7D8", "#91DFEF", "#536473"),
         new("midnight", "Midnight", "Deep ink · periwinkle", "#11172A", "#1B2540", "#293555", "#F4F6FF", "#AFBCDA", "#B7C4FF", "#3C4C70"),
@@ -43,25 +43,12 @@ public static class ThemeManager
         resources["StateTint"] = Frozen(Color.FromArgb(useHighContrast ? (byte)0 : (byte)40, accent.R, accent.G, accent.B));
         var luminance = 0.2126 * accent.ScR + 0.7152 * accent.ScG + 0.0722 * accent.ScB;
         resources["OnAccent"] = useHighContrast ? SystemColors.HighlightTextBrush : luminance > 0.179 ? Brushes.Black : Brushes.White;
-        resources["LensFill"] = UsesGlass
-            ? Gradient(new(0, 0), new(.7, 1), (0, "#8E294D67"), (.47, "#96203147"), (1, "#A0122236"))
-            : useHighContrast ? resources["Chrome"] : Brush(Current.Glass ? "#203548" : Current.Chrome);
-        resources["LensRim"] = UsesGlass
-            ? Gradient(new(0, 0), new(1, 1), (0, "#F7F4FDFF"), (.24, "#D5A6E2FF"), (.53, "#435C96B4"),
-                (.76, "#695080A1"), (1, "#DC9CD9FF"))
+        resources["PickerSurface"] = UsesGlass
+            ? Gradient(new(0, 0), new(.6, 1), (0, "#EA233B4A"), (.52, "#F0172937"), (1, "#F2101D2A"))
+            : useHighContrast ? resources["Chrome"] : Brush(Current.Glass ? "#1B2E3D" : Current.Chrome);
+        resources["PickerRim"] = UsesGlass
+            ? Gradient(new(0, 0), new(1, 1), (0, "#C196BBCF"), (.42, "#7A7D9BAD"), (1, "#57657E94"))
             : resources["Outline"];
-        resources["LensBevel"] = UsesGlass
-            ? Gradient(new(0, 0), new(.72, 1), (0, "#738FCEF2"), (.38, "#03ABCFFF"), (.72, "#087FB3E8"), (1, "#8CC7F4FF"))
-            : Brushes.Transparent;
-        var light = new RadialGradientBrush(Color.FromArgb(UsesGlass ? (byte)88 : (byte)0, 215, 245, 255), Colors.Transparent)
-        {
-            Center = new(.31, .08),
-            GradientOrigin = new(.31, .02),
-            RadiusX = .68,
-            RadiusY = .44
-        };
-        light.Freeze();
-        resources["LensLight"] = light;
     }
 
     private static bool WindowsAllowsTransparency()

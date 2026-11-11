@@ -33,6 +33,7 @@ public sealed class IconControl : FrameworkElement
         ["up"] = Parse("M6,15 L12,9 18,15"),
         ["close"] = Parse("M6,6 L18,18 M18,6 L6,18"),
         ["back"] = Parse("M16,5 L9,12 16,19"),
+        ["next"] = Parse("M9,5 L16,12 9,19"),
         ["more"] = Parse("M5,12 L5.2,12 M12,12 L12.2,12 M19,12 L19.2,12"),
         ["link"] = Parse("M9,15 L15,9 M8,10 L5,13 A4,4 0 0 0 11,19 L14,16 M10,8 L13,5 A4,4 0 0 1 19,11 L16,14"),
         ["info"] = Parse("M12,3 A9,9 0 1 0 12,21 A9,9 0 1 0 12,3 M12,11 L12,17 M12,7 L12,7.1")

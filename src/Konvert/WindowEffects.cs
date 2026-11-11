@@ -14,7 +14,7 @@ public static class WindowEffects
         => new(Math.Clamp(x - width / 2, left + 10, Math.Max(left + 10, right - width - 10)),
             Math.Clamp(y - height / 2, top + 10, Math.Max(top + 10, bottom - height - 10)));
 
-    public static PopupAnchor PlacePopup(Window window, PopupAnchor? anchor, double ringSize)
+    public static PopupAnchor PlacePopup(Window window, PopupAnchor? anchor, double minimumHeight)
     {
         if (anchor is null) { GetCursorPos(out var point); anchor = new(point.X, point.Y); }
         var handle = new WindowInteropHelper(window).Handle;
@@ -23,13 +23,13 @@ public static class WindowEffects
         if (!GetMonitorInfo(monitor, ref info)) return anchor;
         var dpi = GetDpiForMonitor(monitor, 0, out var monitorDpi, out _) == 0 ? monitorDpi / 96.0 : 1;
         var workArea = new Rect(info.Work.Left, info.Work.Top, info.Work.Right - info.Work.Left, info.Work.Bottom - info.Work.Top);
-        var position = FitBesideSelection(anchor, new Size(window.Width * dpi, window.Height * dpi), ringSize * dpi, workArea, dpi);
+        var position = FitBesideSelection(anchor, new Size(window.Width * dpi, window.Height * dpi), minimumHeight * dpi, workArea, dpi);
         SetWindowPos(handle, IntPtr.Zero, (int)position.Left, (int)position.Top,
             (int)position.Width, (int)position.Height, 0x0014); // SWP_NOACTIVATE | SWP_NOZORDER
         return anchor;
     }
 
-    internal static Rect FitBesideSelection(PopupAnchor anchor, Size desired, double ringHeight, Rect workArea, double scale = 1)
+    internal static Rect FitBesideSelection(PopupAnchor anchor, Size desired, double minimumHeight, Rect workArea, double scale = 1)
     {
         var margin = 10 * scale;
         var gap = 8 * scale;
@@ -43,10 +43,10 @@ public static class WindowEffects
         var above = Math.Clamp((anchor.ItemTop ?? anchor.Y) - gap, top, bottom);
         var roomBelow = bottom - below;
         var roomAbove = above - top;
-        var minimumHeight = Math.Min(desired.Height, ringHeight + 64 * scale);
-        if (roomBelow >= minimumHeight || (roomBelow >= ringHeight && roomBelow >= roomAbove))
+        var minimum = Math.Min(desired.Height, minimumHeight);
+        if (roomBelow >= desired.Height || (roomBelow >= minimum && roomBelow >= roomAbove))
             return new(x, below, width, Math.Min(desired.Height, roomBelow));
-        if (roomAbove >= ringHeight)
+        if (roomAbove >= minimum)
         {
             var height = Math.Min(desired.Height, roomAbove);
             return new(x, above - height, width, height);

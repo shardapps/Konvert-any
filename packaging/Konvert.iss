@@ -54,12 +54,15 @@ Source: "{#PayloadDirectory}\Konvert.dll"; Flags: dontcopy
 Source: "{#PayloadDirectory}\Konvert.deps.json"; Flags: dontcopy
 Source: "{#PayloadDirectory}\Konvert.runtimeconfig.json"; Flags: dontcopy
 Source: "{#PayloadDirectory}\KonvertHost.exe"; Flags: dontcopy
+Source: "{#PayloadDirectory}\UglyToad.PdfPig*.dll"; Flags: dontcopy
 Source: "LegacyAlpha.sha256"; Flags: dontcopy
 Source: "{#PayloadDirectory}\Konvert.exe"; DestDir: "{app}\Konvert.App"; Flags: ignoreversion
 Source: "{#PayloadDirectory}\Konvert.dll"; DestDir: "{app}\Konvert.App"; Flags: ignoreversion
 Source: "{#PayloadDirectory}\Konvert.deps.json"; DestDir: "{app}\Konvert.App"; Flags: ignoreversion
 Source: "{#PayloadDirectory}\Konvert.runtimeconfig.json"; DestDir: "{app}\Konvert.App"; Flags: ignoreversion
 Source: "{#PayloadDirectory}\KonvertHost.exe"; DestDir: "{app}\Konvert.App"; Flags: ignoreversion
+Source: "{#PayloadDirectory}\KonvertPdf.exe"; DestDir: "{app}\Konvert.App"; Flags: ignoreversion
+Source: "{#PayloadDirectory}\UglyToad.PdfPig*.dll"; DestDir: "{app}\Konvert.App"; Flags: ignoreversion
 Source: "{#PayloadDirectory}\LICENSE"; DestDir: "{app}\Konvert.App"
 Source: "{#PayloadDirectory}\NOTICE"; DestDir: "{app}\Konvert.App"
 Source: "{#PayloadDirectory}\PRIVACY.md"; DestDir: "{app}\Konvert.App"

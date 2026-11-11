@@ -22,13 +22,14 @@ jobs:
       - run: dotnet restore Konvert.sln
       - run: dotnet build Konvert.sln -c Release --no-restore
       - run: dotnet format Konvert.sln --verify-no-changes --no-restore
-      - run: dotnet run --project tests/Konvert.Tests -c Release --no-build
-      - name: Compile and test native shortcut listener
+      - name: Compile and test Windows helpers
         shell: pwsh
         run: |
           ./scripts/Build-NativeHost.ps1 -Architecture x64
           $test = Start-Process artifacts/native-x64/KonvertHost.exe -ArgumentList '--self-test' -Wait -PassThru
           if ($test.ExitCode) { throw 'Native listener tests failed.' }
+          Copy-Item artifacts/native-x64/KonvertPdf.exe tests/Konvert.Tests/bin/Release/net10.0-windows/
+      - run: dotnet run --project tests/Konvert.Tests -c Release --no-build -- --require-pdf-renderer
       - name: Dependency audit
         shell: pwsh
         run: |

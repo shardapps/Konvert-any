@@ -5,6 +5,9 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>../../packaging/Assets/Konvert.ico</ApplicationIcon>
     <AssemblyName>Konvert</AssemblyName>
-    <Description>Local file conversion from a native Windows radial menu.</Description>
+    <Description>Local file conversion from a compact Windows picker.</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+  </ItemGroup>
 </Project>

@@ -67,18 +67,22 @@ internal static class Ui
         "ts" => "MPEG transport stream",
         "caf" => "Core Audio file",
         "json" => "JSON data",
+        "zip" => "ZIP archive",
+        "ipynb" => "Jupyter notebook",
+        "md" => "Markdown",
         _ => $"{extension.ToUpperInvariant()} {FormatCategory(extension).ToLowerInvariant()}"
     };
 
     public static string FormatCategory(string extension) => extension switch
     {
         "png" or "jpg" or "bmp" or "tiff" or "gif" or "ico" or "webp" or "avif" or "heif" or "heic" or "wdp" => "Image",
-        "txt" or "html" or "rtf" => "Text",
+        "txt" or "html" or "rtf" or "md" => "Text",
         "csv" or "tsv" or "xlsx" or "ods" => "Table",
         "pptx" or "odp" => "Slides",
         "mp3" or "wav" or "flac" or "ogg" or "m4a" or "opus" or "aac" or "aiff" or "caf" => "Audio",
         "mp4" or "webm" or "mkv" or "mov" or "avi" or "ts" => "Video",
         "json" => "Data",
+        "zip" => "Archive",
         _ => "Document"
     };
 
@@ -89,6 +93,7 @@ internal static class Ui
         "Video" => "video",
         "Table" or "Data" => "table",
         "Slides" => "slides",
+        "Archive" => "folder",
         _ => "file"
     };
 }

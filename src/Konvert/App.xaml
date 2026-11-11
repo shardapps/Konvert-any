@@ -8,10 +8,8 @@
     <SolidColorBrush x:Key="StateTint" Color="#28ADEBFF"/>
     <SolidColorBrush x:Key="TooltipFill" Color="#162837"/>
     <SolidColorBrush x:Key="OnAccent" Color="#101820"/>
-    <SolidColorBrush x:Key="LensFill" Color="#96203147"/>
-    <SolidColorBrush x:Key="LensRim" Color="#D5A6E2FF"/>
-    <SolidColorBrush x:Key="LensBevel" Color="#438FC6EA"/>
-    <SolidColorBrush x:Key="LensLight" Color="Transparent"/>
+    <SolidColorBrush x:Key="PickerSurface" Color="#F2182634"/>
+    <SolidColorBrush x:Key="PickerRim" Color="#68889C"/>
     <Style TargetType="Window"><Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI"/><Setter Property="FontSize" Value="14"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="Background" Value="{DynamicResource Chrome}"/></Style>
     <Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Ink}"/></Style>
     <Style TargetType="ToolTip">
@@ -38,21 +36,6 @@
           <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource Accent}"/><Setter TargetName="Frame" Property="BorderThickness" Value="2"/></Trigger>
           <Trigger Property="IsPressed" Value="True"><Setter TargetName="Frame" Property="Opacity" Value="0.75"/></Trigger>
           <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Frame" Property="Opacity" Value="0.45"/></Trigger>
-        </ControlTemplate.Triggers>
-      </ControlTemplate></Setter.Value></Setter>
-    </Style>
-    <Style x:Key="RoundButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
-        <Grid>
-          <Ellipse x:Name="Disc" Fill="{TemplateBinding Background}" Stroke="{TemplateBinding BorderBrush}" StrokeThickness="1"/>
-          <Ellipse x:Name="Tint" Margin="1" Fill="{DynamicResource StateTint}" IsHitTestVisible="False" Opacity="0"/>
-          <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-        </Grid>
-        <ControlTemplate.Triggers>
-          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Disc" Property="Stroke" Value="{DynamicResource Accent}"/><Setter TargetName="Tint" Property="Opacity" Value="1"/></Trigger>
-          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Disc" Property="Stroke" Value="{DynamicResource Accent}"/><Setter TargetName="Disc" Property="StrokeThickness" Value="2"/></Trigger>
-          <Trigger Property="IsPressed" Value="True"><Setter TargetName="Disc" Property="Opacity" Value="0.7"/></Trigger>
-          <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.48"/></Trigger>
         </ControlTemplate.Triggers>
       </ControlTemplate></Setter.Value></Setter>
     </Style>

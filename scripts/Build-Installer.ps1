@@ -11,7 +11,7 @@ if (!$PayloadDirectory) {
     $PayloadDirectory=Join-Path $root "artifacts/win-$Architecture-compact"
 }
 $PayloadDirectory=(Resolve-Path -LiteralPath $PayloadDirectory).Path
-foreach ($required in @('Konvert.exe','Konvert.dll','KonvertHost.exe','Konvert.runtimeconfig.json','Konvert.deps.json',
+foreach ($required in @('Konvert.exe','Konvert.dll','KonvertHost.exe','KonvertPdf.exe','UglyToad.PdfPig.dll','Konvert.runtimeconfig.json','Konvert.deps.json',
     'LICENSE','NOTICE','PRIVACY.md','THIRD_PARTY_NOTICES.md')) {
     if (!(Test-Path -LiteralPath (Join-Path $PayloadDirectory $required))) { throw "Installer payload missing $required." }
 }
@@ -22,7 +22,7 @@ $runtimeVersion = ([version]$runtime.version).ToString(2)
 $version = ([xml](Get-Content (Join-Path $root 'Directory.Build.props') -Raw)).Project.PropertyGroup.Version
 $fileVersion = ([version]($version.Split('-')[0])).ToString(3) + '.0'
 $expectedMachine=if($Architecture -eq 'arm64'){0xAA64}else{0x8664}
-foreach ($name in @('Konvert.exe','KonvertHost.exe')) {
+foreach ($name in @('Konvert.exe','KonvertHost.exe','KonvertPdf.exe')) {
     $stream=[IO.File]::OpenRead((Join-Path $PayloadDirectory $name))
     $reader=[IO.BinaryReader]::new($stream)
     try {

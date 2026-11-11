@@ -15,9 +15,9 @@
 
 </div>
 
-Konvert is a free, open source **Windows file converter** by **Shardapps**. Select one file in Explorer or on the desktop and press **Ctrl+K**. A 224 DIP circle opens below the selection when there’s room, with up to three labelled formats. Pick one to save beside the original at standard quality. Open **Options** for the full format list, a folder picker, image size, JPEG quality, and DPI.
+Konvert is a free, open source **Windows file converter** by **Shardapps**. Select a file in Explorer or on the desktop and press **Ctrl+K**. The compact picker shows the filename and up to three quick formats. A quick choice saves beside the original. Open **Options** to choose a format, set its options and destination, then press **Convert**.
 
-**0.3.3 alpha** adds a clearer Glass lens, an image size control, and more image, document, table, and media formats. The first-launch picker and file popup both dismiss on an outside click. Active exports finish in the background. Compact **x64 and ARM64 setup EXEs** use the shared Microsoft .NET 10 Desktop Runtime.
+**0.4 alpha** adds PDF-to-text, editable Word, page images, and page archives. It also exports Jupyter notebooks to HTML, Markdown, and text. The picker uses one window for choices, settings, progress, and results. Compact **x64 and ARM64 setup EXEs** use the shared Microsoft .NET 10 Desktop Runtime.
 
 ## Stay in your flow
 
@@ -29,11 +29,11 @@ The small native listener registers Ctrl+K **only while Explorer or the desktop 
 
 ## A quieter surface
 
-**Glass** is the default. The desktop shows through an icy blue lens with a lit rim. Solid controls keep format labels readable. Six additional themes are **Pearl, Graphite, Midnight, Ocean, Lavender and Forest**. Settings includes live previews and controls for reducing transparency or motion.
+**Glass** uses a translucent graphite surface and a cool edge. Six additional themes are **Pearl, Graphite, Midnight, Ocean, Lavender and Forest**. Settings includes live previews and controls for reducing transparency or motion.
 
 The design draws on Apple’s floating material layers, Google’s control hierarchy, and Shardapps’ compact utilities. [Design decisions and references](docs/DESIGN.md).
 
-![Konvert’s first-launch picker, quick conversion ring, and expanded image options rendered over a generated background](docs/assets/clear-glass-picker.png)
+![Konvert’s compact PDF picker, conversion options, and unsupported-file recovery](docs/assets/clear-glass-picker.png)
 
 ## Conversions that tell you what they need
 
@@ -45,6 +45,8 @@ The design draws on Apple’s floating material layers, Google’s control hiera
 | Text | Raw text → UTF-8 TXT or escaped HTML text page | Built in |
 | Tables | CSV ↔ TSV; CSV/TSV → JSON; flat JSON → CSV or TSV | Built in |
 | Document text | DOCX/ODT → TXT | Built in |
+| PDF | PDF → TXT or editable DOCX; render PNG/JPG pages or a PNG ZIP | Built in |
+| Notebooks | IPYNB → HTML, Markdown, or TXT | Built in |
 | Documents | DOCX, DOC, ODT, RTF → PDF and office formats | Local LibreOffice |
 | Spreadsheets | XLSX, XLS, ODS, CSV/TSV → PDF and spreadsheet formats | Local LibreOffice |
 | Presentations | PPTX, PPT, ODP → PDF and presentation formats | Local LibreOffice |
@@ -61,23 +63,26 @@ The format matrix documents loss from re-encoding, Office layout differences, fi
 3. Choose Explorer/PATH integration and startup preferences in setup. Ctrl+K is ready after the listener starts; open a **new terminal** to pick up PATH changes.
 4. Select one file in Explorer and press **Ctrl+K**. For office/media exports, open **Settings → Converters** and configure LibreOffice/FFmpeg.
 
-Windows 11 is the support target. The ARM64 setup contains a native ARM64 app and listener. Physical ARM64 testing remains pending. Windows 11 shows the Konvert context entry under **Show more options**. MSIX is a separate, unsigned Store-preparation artifact. [Install, upgrade and uninstall details](docs/INSTALLATION.md).
+Windows 11 is the support target. The ARM64 setup includes an ARM64 app, listener, and PDF renderer. Physical ARM64 testing remains pending. Windows 11 shows the Konvert context entry under **Show more options**. MSIX is a separate, unsigned Store-preparation artifact. [Install, upgrade and uninstall details](docs/INSTALLATION.md).
 
 ## Local, bounded work
 
 No accounts, uploads, ads or telemetry. Preferences remain local. Original and existing files are protected by staged outputs and no-overwrite commits. Heavy conversion runs away from the UI thread; only one heavy job runs per process. Text/diagnostics use bounded buffers, and native image/table sizes have explicit limits.
 
-The resident component is a small **C++20 Win32 listener**. The **.NET 10/WPF UI** opens on demand. The compact installer contains the app and listener. The separate MSIX build includes its runtime. [Measurements and methodology](docs/PERFORMANCE.md).
+The resident component is a small **C++20 Win32 listener**. The **.NET 10/WPF UI** and native PDF renderer launch on demand. The separate MSIX build includes the desktop runtime. [Measurements and methodology](docs/PERFORMANCE.md).
 
 ## From a terminal
 
 ```powershell
-# Open the radial popup
+# Open the picker
 Konvert.exe "C:\\Files\\report.docx"
 
 # Wait for a headless conversion
 $job = Start-Process Konvert.exe -ArgumentList '--convert "C:\\Files\\photo.png" --to jpg --output "C:\\Exports"' -Wait -PassThru
 $job.ExitCode  # 0 = success, 1 = failure
+
+# Render the second page of a PDF
+Start-Process Konvert.exe -ArgumentList '--convert "C:\Files\report.pdf" --to png --page 2 --dpi 144' -Wait
 
 Konvert.exe --settings
 ```

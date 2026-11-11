@@ -1,25 +1,25 @@
 # Konvert project facts
 
-Updated 2026-11-10 for 0.3.3-alpha.1. [shardapps/Konvert-any](https://github.com/shardapps/Konvert-any).
+Updated for 0.4.0-alpha.1. [shardapps/Konvert-any](https://github.com/shardapps/Konvert-any).
 
 | Field | Fact |
 | --- | --- |
 | Product | Konvert, by Shardapps |
 | Category | Local Windows file converter |
 | Platform | Windows 11; x64 and native ARM64 builds; physical ARM64 verification pending |
-| Interaction | Ctrl+K on one selected file opens a 224 DIP circle below the selection when space permits. **Options** reveals extra formats and settings. Clicking away dismisses the popup and allows an active conversion to finish. |
+| Interaction | Ctrl+K on a selected file opens a compact picker beside it. **Options** shows a format and output form with a fixed Convert button. Clicking away dismisses the picker and allows an active conversion to finish. |
 | Persistent component | Small C++20 event-driven shortcut listener with tray pause/quit |
 | Transient component | .NET 10/WPF conversion UI; no embedded browser |
 | Themes | Glass default with translucency, a solid fallback, and reduced-motion support. Pearl, Graphite, Midnight, Ocean, Lavender, Forest. |
 | Installers | Compact x64 and ARM64 setup EXEs. Runtime preflight, in-place upgrades and exact-match cleanup of known legacy files. |
 | Default install directory | %LOCALAPPDATA%\\Programs\\Shardapps\\Konvert |
-| Native conversions | Images, six-size ICO, image PDF, raw text/HTML, DOCX/ODT text, CSV/TSV/flat JSON |
+| Built-in conversions | Images, six-size ICO, PDF text and page rendering, notebook text/HTML/Markdown, DOCX/ODT text, CSV/TSV/flat JSON |
 | Optional conversions | Windows codecs for modern image input, LibreOffice for layout-aware Office export, FFmpeg for audio, video, and WebP |
 | Output | Beside original or configured directory; no overwrite |
 | Privacy | Local processing; no app telemetry, accounts or upload backend |
 | License | Apache-2.0 |
 | Status | Unsigned alpha; no Konvert Microsoft Store listing yet |
 
-Short description: **Konvert is an open source Windows file converter with a Ctrl+K radial popup, seven themes, local processing, safe output naming and optional LibreOffice/FFmpeg integrations.**
+**Konvert is an open source Windows file converter with a Ctrl+K picker, seven themes, local PDF and notebook exports, and optional LibreOffice/FFmpeg integrations.**
 
 Do not describe it as a universal lossless converter, OCR/PDF editor, certified Store app, or an app with no resident process. The listener is persistent while enabled; the UI is transient. [Format limits](FORMATS.md) and [performance methodology](PERFORMANCE.md) control performance/fidelity claims.

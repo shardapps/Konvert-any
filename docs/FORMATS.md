@@ -9,11 +9,18 @@ The menu combines the source extension with installed engine capabilities. Konve
 | PNG, JPG/JPEG, BMP, GIF, TIF/TIFF, ICO, WDP/JXR/HDP | PNG, JPG, BMP, TIFF, GIF, ICO, PDF | First frame or page. ICO input uses its largest frame. ICO export includes 16, 32, 48, 64, 128, and 256 px. |
 | TXT, MD, LOG, JSON, XML, YAML/YML, CSV, TSV, HTML/HTM, CSS, JS, CS, PY, SQL | TXT; HTML except for HTML/HTM inputs | Preserves raw text; HTML wraps escaped text in a readable page |
 | DOCX, ODT | TXT | Main document paragraphs, text runs, tabs and breaks. Layout-aware output is available through the optional Office engine. |
+| PDF | TXT, DOCX | Extracts selectable text across the document. DOCX has page breaks and editable paragraphs with simplified formatting. |
+| PDF | PNG, JPG, ZIP | Renders one page to PNG/JPG, or all pages to a ZIP of numbered PNG images. Options sets the page, resolution, and maximum image edge. |
+| IPYNB | HTML, Markdown, TXT | Exports cells and textual outputs in order. HTML escapes cell content. Markdown preserves Markdown source and formats code as blocks. |
 | CSV | JSON, TSV | JSON uses the first row as unique, non-empty headings; all values remain strings |
 | TSV | JSON, CSV | Quoted tabs, escaped quotes and multiline fields supported |
 | JSON | CSV, TSV | Accepts an array of flat objects. The union of keys becomes the header and missing or null values become empty fields. |
 
 Aliases share their base format, and the picker omits same-format exports. Markdown-to-HTML displays escaped Markdown source. HTML-to-TXT preserves source markup. Text decoding supports strict UTF-8 and BOM-marked UTF-16/32.
+
+PDF rendering works for scanned pages. TXT and DOCX require a selectable text layer and use a best-effort reading order. Scans can be exported as images. The renderer reads PDFs up to 128 MiB and renders up to 16 megapixels per output page. Text exports support up to 500 pages, and page ZIPs support up to 100 pages and 512 MiB of PNGs. Open encrypted PDFs in a PDF viewer and save an unlocked copy first. [Windows PDF API](https://learn.microsoft.com/windows/uwp/api/windows.data.pdf).
+
+Notebook export reads the saved file and includes source, stream output, plain-text display data, and tracebacks. Interactive widgets, media, and rich display data stay in the source notebook.
 
 ## Optional Windows image codecs
 
@@ -71,4 +78,4 @@ Audio and video exports select the first matching track. Video exports omit subt
 - Empty text outputs are allowed. Failed or cancelled operations clean staging files on a best-effort basis. Native codec calls cannot be interrupted mid-call; cancellation completes when that call returns.
 - One file at a time. Multiple app processes are not globally serialized. A crash/power loss can leave temporary files. Existing files are never deliberately overwritten.
 
-PDF input conversion, HEIC/AVIF/SVG export, archives, OCR, batches, and media quality presets are planned.
+OCR, HEIC/AVIF/SVG export, general archive conversion, batches, and media quality presets are planned.

@@ -1,6 +1,6 @@
 namespace Konvert;
 
-internal enum ConversionBackend { Image, WindowsImage, Text, Table, Office, Media }
+internal enum ConversionBackend { Image, WindowsImage, Text, Table, Office, Media, PdfText, PdfImage, Notebook }
 
 internal sealed record ConversionRoute(
     string Extension,
@@ -19,20 +19,25 @@ internal sealed record ConversionRoute(
     public ConversionTarget Target => new(Extension, Extension.ToUpperInvariant(), Detail, Backend switch
     {
         ConversionBackend.WindowsImage => "Windows image codec",
+        ConversionBackend.PdfImage => "Windows PDF",
         ConversionBackend.Office => "LibreOffice",
         ConversionBackend.Media => "FFmpeg",
         _ => "Built in"
     })
     {
-        SupportsJpegQuality = IsImage && Extension is "jpg" or "pdf",
-        SupportsDpi = IsImage && Extension is not ("gif" or "ico"),
-        SupportsImageSize = (IsImage || StillImage) && Extension != "ico"
+        SupportsJpegQuality = (IsImage && Extension is "jpg" or "pdf") || (Backend == ConversionBackend.PdfImage && Extension == "jpg"),
+        SupportsDpi = (IsImage && Extension is not ("gif" or "ico")) || Backend == ConversionBackend.PdfImage,
+        SupportsImageSize = (IsImage || StillImage || Backend == ConversionBackend.PdfImage) && Extension != "ico",
+        SupportsPdfPage = Backend == ConversionBackend.PdfImage && Extension != "zip"
     };
 
     public bool IsAvailable(EngineCapabilities capabilities) => Backend switch
     {
         ConversionBackend.Office => capabilities.LibreOffice is not null,
         ConversionBackend.WindowsImage => capabilities.HasWindowsImageCodec,
+        ConversionBackend.PdfText => capabilities.PdfPageCount is null or <= PdfConverter.MaxTextPages,
+        ConversionBackend.PdfImage => capabilities.PdfRenderer is not null && !capabilities.PdfRenderFailed &&
+            (Extension != "zip" || capabilities.PdfPageCount is null or <= 100),
         ConversionBackend.Media => capabilities.Ffmpeg is not null &&
             Encoders!.All(capabilities.Encoders.Contains) &&
             (Muxer is null || capabilities.Muxers?.Contains(Muxer) != false) &&
@@ -66,6 +71,14 @@ public sealed class FormatRegistry(EngineCapabilities capabilities)
     ];
     private static readonly ConversionRoute[] Routes =
     [
+        new("txt", "Extract selectable text from all pages", ConversionBackend.PdfText, ["pdf"]),
+        new("png", "Render one page · choose the page in Options", ConversionBackend.PdfImage, ["pdf"]),
+        new("docx", "Editable text with page breaks · simplified layout", ConversionBackend.PdfText, ["pdf"]),
+        new("jpg", "Render one page as JPEG", ConversionBackend.PdfImage, ["pdf"]),
+        new("zip", "Render all pages as numbered PNG images", ConversionBackend.PdfImage, ["pdf"]),
+        new("html", "Static notebook with code and text output", ConversionBackend.Notebook, ["ipynb"]),
+        new("md", "Markdown and code blocks from the notebook", ConversionBackend.Notebook, ["ipynb"]),
+        new("txt", "Notebook text and code cells", ConversionBackend.Notebook, ["ipynb"]),
         .. ImageExports.Select(item => new ConversionRoute(item.Extension, item.Detail, ConversionBackend.Image, Images)),
         .. ImageExports.Select(item => new ConversionRoute(item.Extension, item.Detail, ConversionBackend.WindowsImage, OptionalImages)),
         StillRoute("webp", "Lossless WebP · first frame", "libwebp", ["png", "jpg", "bmp", "gif", "tiff", "ico"], ["-lossless", "1"]),
@@ -138,6 +151,10 @@ public sealed class FormatRegistry(EngineCapabilities capabilities)
                 UnavailableReason = available is not null ? null : route.Backend switch
                 {
                     ConversionBackend.WindowsImage => "Windows could not read this image. Check the installed image extensions or verify the file.",
+                    ConversionBackend.PdfText => "Text export supports up to 500 PDF pages.",
+                    ConversionBackend.PdfImage when capabilities.PdfRenderer is null => "Repair Konvert to restore the PDF renderer.",
+                    ConversionBackend.PdfImage when capabilities.PdfRenderFailed => "Windows could not read this PDF. Check that it opens without a password.",
+                    ConversionBackend.PdfImage => "The image archive supports up to 100 pages. Use PNG or JPG for an individual page.",
                     ConversionBackend.Media when capabilities.Ffmpeg is not null => "This FFmpeg build is missing a required encoder or container.",
                     _ => $"Set up {route.Target.Engine} in Preferences."
                 }

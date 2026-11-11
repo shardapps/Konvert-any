@@ -18,7 +18,10 @@ $source=Join-Path $root 'native'
 @rc /nologo /fo "$Output\KonvertHost.res" KonvertHost.rc
 @if errorlevel 1 exit /b 1
 @cl /nologo /std:c++20 /EHsc /W4 /WX /O1 /MT /DUNICODE /D_UNICODE /Fo"$Output\KonvertHost.obj" KonvertHost.cpp "$Output\KonvertHost.res" /Fe"$Output\KonvertHost.exe" /link /SUBSYSTEM:WINDOWS /DYNAMICBASE /NXCOMPAT /GUARD:CF ole32.lib oleaut32.lib shell32.lib user32.lib advapi32.lib uuid.lib
+@if errorlevel 1 exit /b 1
+@cl /nologo /std:c++20 /EHsc /W4 /WX /O1 /MT /DUNICODE /D_UNICODE /Fo"$Output\KonvertPdf.obj" KonvertPdf.cpp /Fe"$Output\KonvertPdf.exe" /link /SUBSYSTEM:CONSOLE /DYNAMICBASE /NXCOMPAT /GUARD:CF windowsapp.lib
 "@ | Set-Content -LiteralPath $batch
 & $env:ComSpec /d /c $batch
-if ($LASTEXITCODE) { throw 'Native shortcut listener build failed.' }
+if ($LASTEXITCODE) { throw 'Native Konvert build failed.' }
 Write-Output "Native $Architecture listener: $Output/KonvertHost.exe"
+Write-Output "Native $Architecture PDF renderer: $Output/KonvertPdf.exe"
