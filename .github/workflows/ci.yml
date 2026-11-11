@@ -15,7 +15,7 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: '10.0.x'
@@ -41,7 +41,7 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
         with:
           dotnet-version: '10.0.x'
@@ -63,7 +63,7 @@ jobs:
       matrix:
         arch: [x64, arm64]
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
         with:
           dotnet-version: '10.0.x'
@@ -74,7 +74,7 @@ jobs:
       - run: ./scripts/Build-Installer.ps1 -Architecture ${{ matrix.arch }} -PayloadDirectory artifacts/win-${{ matrix.arch }}-compact
       - name: Check out the standalone alpha for migration testing
         if: matrix.arch == 'x64'
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: cd062b3efe69569d0af529f50cb4d93e03239e9c
           path: artifacts/legacy-0.2
